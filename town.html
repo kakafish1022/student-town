@@ -15,7 +15,6 @@
     .hotspot-label { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(25,16,10,0.92); border: 1.5px solid #e5b567; color: #ffea9f; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
     .hotspot:hover .hotspot-label { opacity: 1; }
 
-    /* 走路上下微幅彈跳動畫 */
     @keyframes npcBob {
       0%, 100% { transform: translateY(0px); }
       50% { transform: translateY(-3px); }
@@ -24,15 +23,25 @@
       position: absolute;
       z-index: 15;
       cursor: pointer;
-      transform: translate(-50%, -85%); /* 腳底對齊道路座標點 */
+      transform: translate(-50%, -85%);
       display: flex;
       flex-direction: column;
       align-items: center;
     }
     .npc-sprite {
       font-size: 24px;
+      line-height: 1;
       filter: drop-shadow(0 3px 2px rgba(0,0,0,0.85));
       animation: npcBob 0.5s infinite ease-in-out;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .npc-img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      image-rendering: pixelated;
     }
     .npc-bubble {
       background: rgba(255, 251, 235, 0.95);
@@ -117,13 +126,14 @@
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
+    // === 精準更新後的建築物熱區座標 ===
     const TOWN_HOTSPOTS = [
-      { id: "hall",     name: "🏛️ 城鎮中心",     url: "hall.html", left: 41.8, top: 1.9,  width: 16.6, height: 36.3 },
-      { id: "tavern",   name: "🍺 冒險者酒館",   url: "",          left: 12.0, top: 8.8,  width: 19.0, height: 33.9 },
-      { id: "alchemy",  name: "⚗️ 魔法煉金室",   url: "",          left: 65.3, top: 10.1, width: 21.6, height: 35.8 },
-      { id: "fountain", name: "⛲ 中央許願池",   url: "",          left: 43.1, top: 42.1, width: 14.2, height: 17.1 },
-      { id: "board",    name: "📋 村莊佈告欄",   url: "MODAL",     left: 55.7, top: 62.6, width: 8.5,  height: 14.3 },
-      { id: "ranch",    name: "🐾 奇幻寵物牧場", url: "",          left: 75.1, top: 50.3, width: 19.3, height: 29.7 }
+      { id: "hall",     name: "🏛️ 城鎮中心",     url: "hall.html", left: 41.0, top: 15.2, width: 17.0, height: 22.0 },
+      { id: "tavern",   name: "🍺 冒險者酒館",   url: "",          left: 15.7, top: 19.3, width: 13.7, height: 24.6 },
+      { id: "alchemy",  name: "⚗️ 魔法煉金室",   url: "",          left: 67.4, top: 24.6, width: 16.0, height: 21.0 },
+      { id: "fountain", name: "⛲ 中央許願池",   url: "",          left: 43.0, top: 48.0, width: 14.0, height: 14.0 },
+      { id: "board",    name: "📋 村莊佈告欄",   url: "MODAL",     left: 55.4, top: 64.5, width: 7.4,  height: 6.9  },
+      { id: "ranch",    name: "🐾 奇幻寵物牧場", url: "",          left: 78.0, top: 50.5, width: 13.6, height: 22.9 }
     ];
 
     document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
@@ -147,52 +157,98 @@
       }
     });
 
-    // === 【聯集道路網：環狀廣場 (outer - hole) ∪ 4條斜向石橋通道】 ===
-    const ROAD_UNION = {
-      outerEllipse: { cx: 50.3, cy: 56.9, rx: 22.6, ry: 18.7 },
-      holeEllipse:  { cx: 50.8, cy: 57.2, rx: 18.6, ry: 13.4 },
-      walkPolys: [
-        [{x:11.3, y:88}, {x:37, y:67.7}, {x:39.4, y:70.5}, {x:16, y:92.3}],
-        [{x:14.5, y:92.4}, {x:19.4, y:99.5}, {x:29.2, y:100}, {x:18.1, y:88.7}],
-        [{x:47.1, y:72.7}, {x:86.1, y:99.2}, {x:79.5, y:100}, {x:43.2, y:74.6}],
-        [{x:29.6, y:60.3}, {x:10.6, y:44.6}, {x:9.7, y:40.5}, {x:29.4, y:55.3}]
-      ]
-    };
+    // === 100x56 筆刷精準描繪石板路網格（1 = 可行走路面, 0 = 障礙物/草叢/建築） ===
+    const WALK_GRID = [
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000011000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000001111000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "0000000000000111110000000000000011110000000000000000000000000000000111100000000000000000000000000000",
+      "0000000000000001111110000000001111110000000000000000000000000000011111100000000000000000000000000000",
+      "0000000000000000011011110000001111000000000000000000000000000000001111000000000000000000000000000000",
+      "0000000000000000000000011111111110000000000000000000000000000000000111000000000000000000000000000000",
+      "0000000000000000000000001111111100000000000000000000000000000000000011110000000000000000000000000000",
+      "0000000000000000000000000111111000000000000000000000000000000000000001111000000000000000000000000000",
+      "0000000000000000000000000111111000000000000000000000000000000000000001111000000000000000000000000000",
+      "0000000000000000000000000111111000000000000000000000000000000000000001110000000000000000000000000000",
+      "0000000000000000000000000011111000000000000000000000000000000000000001110000000000000000000000000000",
+      "0000000000000000000000000000111100000000000000000000000000000000000011100000000000000000000000000000",
+      "0000000000000000000000000000001111000000000000000000000000000000001111100000000000000000000000000000",
+      "0000000000000000000000000000000111110000000000000000000000000000011110000000000000000000000000000000",
+      "0000000000000000000000000000000011111111110000000000000000000000111100000000000000000000000000000000",
+      "0000000000000000000000000000000011111111111111100000000000000000111100000000000000000000000000000000",
+      "0000000000000000000000000000000011111011111111100000000000000001111000000000000000000000000000000000",
+      "0000000000000000000000000000111111110011111111110000000000000011111000000000000000000000000000000000",
+      "0000000000000000000000000011111110000000000011111100000000001110000000000000000000000000000000000000",
+      "0000000000000000000000001111111000000000000000111111110001111100000000000000000000000000000000000000",
+      "0000000000000000000000111111000000000000000000000011111111110000000000000000000000000000000000000000",
+      "0000000000000000000011111100000000000000000000000000011111110000000000000000000000000000000000000000",
+      "0000000000000000011111111000000000000000000000000000000011111100000000000000000000000000000000000000",
+      "0000000000001111111111100000000000000000000000000000000000011111000000000000000000000000000000000000",
+      "0000000000111111111111000000000000000000000000000000000000000111111000000000000000000000000000000000",
+      "0000000000000011111100000000000000000000000000000000000000000011111111000000000000000000000000000000",
+      "0000000000000001111100000000000000000000000000000000000000000000011111110000000000000000000000000000",
+      "0000000000000011111111000000000000000000000000000000000000000000001111111110000000000000000000000000",
+      "0000000000000000111111110000000000000000000000000000000000000000000011111111111000000000000000000000",
+      "0000000000000000111111111110000000000000000000000000000000000000000000100111111110000000000000000000",
+      "0000000000000000011111111111110000000000000000000000000000000000000000000000111111111000000000000000",
+      "0000000000000000000111111111111000000000000000000000000000000000000000000000000111111110000000000000"
+    ];
 
-    // 幾何判斷：點是否在橢圓內
-    function inEllipse(x, y, e) {
-      const dx = (x - e.cx) / e.rx;
-      const dy = (y - e.cy) / e.ry;
-      return (dx * dx + dy * dy) <= 1.0;
-    }
+    const GRID_ROWS = WALK_GRID.length;
+    const GRID_COLS = WALK_GRID[0].length;
 
-    // 幾何判斷：射線法判斷點是否在任意多邊形內
-    function inPolygon(x, y, poly) {
-      let inside = false;
-      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-        const xi = poly[i].x, yi = poly[i].y;
-        const xj = poly[j].x, yj = poly[j].y;
-        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
-    }
-
-    // 總聯集判定：只要在「環狀道路」OR「任一石橋多邊形」內，即為安全可行走路面
     function isWalkable(x, y) {
-      const inRing = inEllipse(x, y, ROAD_UNION.outerEllipse) && !inEllipse(x, y, ROAD_UNION.holeEllipse);
-      if (inRing) return true;
-      for (const poly of ROAD_UNION.walkPolys) {
-        if (inPolygon(x, y, poly)) return true;
-      }
-      return false;
+      const col = Math.floor((x / 100) * GRID_COLS);
+      const row = Math.floor((y / 100) * GRID_ROWS);
+      if (row < 0 || row >= GRID_ROWS || col < 0 || col >= GRID_COLS) return false;
+      return WALK_GRID[row][col] === '1';
     }
 
+    function snapToNearestWalkable(tx, ty) {
+      if (isWalkable(tx, ty)) return { x: tx, y: ty };
+      let best = { x: 40, y: 72 }, minDist = 999999;
+      for (let r = 0; r < GRID_ROWS; r++) {
+        for (let c = 0; c < GRID_COLS; c++) {
+          if (WALK_GRID[r][c] === '1') {
+            const px = ((c + 0.5) / GRID_COLS) * 100;
+            const py = ((r + 0.5) / GRID_ROWS) * 100;
+            const d = (px - tx) ** 2 + (py - ty) ** 2;
+            if (d < minDist) { minDist = d; best = { x: px, y: py }; }
+          }
+        }
+      }
+      return best;
+    }
+
+    // === 【可自訂 PNG 角色系統：優先載入 img，尚未上傳圖檔時自動顯示 fallbackIcon】 ===
     const NPC_LIST = [
-      { minStage: 1, icon: "🧙‍♂️", start: {x: 50.3, y: 73.0}, speed: 0.04,  lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "走過石橋去看看風景～"] },
-      { minStage: 1, icon: "🐈",   start: {x: 35.0, y: 69.0}, speed: 0.055, lines: ["喵～佈告欄有新留言！", "喵嗚～追不到我吧！", "摸我一下會有好運喵！"] },
-      { minStage: 2, icon: "🧝‍♀️", start: {x: 69.0, y: 57.0}, speed: 0.045, lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"] },
-      { minStage: 3, icon: "🛡️",   start: {x: 50.3, y: 41.0}, speed: 0.038, lines: ["守護黃金水晶之都！", "你是全班的數學英雄！", "榮譽榜上有你的名字嗎？"] }
+      { minStage: 1, img: "npc1.png", fallbackIcon: "🧙‍♂️", start: {x: 42, y: 71}, speed: 0.038, lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "走過石橋去看看風景～"] },
+      { minStage: 1, img: "npc2.png", fallbackIcon: "🐈",   start: {x: 22, y: 84}, speed: 0.052, lines: ["喵～佈告欄有新留言！", "喵嗚～追不到我吧！", "摸我一下會有好運喵！"] },
+      { minStage: 1, img: "npc3.png", fallbackIcon: "🗡️",   start: {x: 68, y: 62}, speed: 0.044, lines: ["準備好挑戰數學任務了嗎？", "聽說酒館快要開張囉！", "一起把小鎮升到 Lv.3 吧！"] },
+      { minStage: 2, img: "npc4.png", fallbackIcon: "🧝‍♀️", start: {x: 28, y: 52}, speed: 0.036, lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"] }
     ];
 
     let npcState = [];
@@ -206,14 +262,15 @@
       const activeNPCs = NPC_LIST.filter(n => stage >= n.minStage);
 
       npcState = activeNPCs.map((npc, idx) => {
+        const pos = snapToNearestWalkable(npc.start.x, npc.start.y);
         const angle = (Math.random() * 0.5 + 0.25) * Math.PI * (idx % 2 === 0 ? 1 : -1);
         const vx = Math.cos(angle) * npc.speed;
         const vy = Math.sin(angle) * npc.speed;
 
         const el = document.createElement('div');
         el.className = 'npc-walker';
-        el.style.left = npc.start.x + '%';
-        el.style.top = npc.start.y + '%';
+        el.style.left = pos.x + '%';
+        el.style.top = pos.y + '%';
 
         const bubble = document.createElement('div');
         bubble.className = 'npc-bubble hidden';
@@ -221,8 +278,15 @@
 
         const sprite = document.createElement('div');
         sprite.className = 'npc-sprite';
-        sprite.textContent = npc.icon;
         sprite.style.transform = vx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+
+        const imgEl = document.createElement('img');
+        imgEl.src = npc.img;
+        imgEl.className = 'npc-img';
+        imgEl.onerror = () => {
+          sprite.innerHTML = npc.fallbackIcon;
+        };
+        sprite.appendChild(imgEl);
 
         el.appendChild(bubble);
         el.appendChild(sprite);
@@ -235,7 +299,7 @@
           setTimeout(() => bubble.classList.add('hidden'), 3000);
         });
 
-        return { npc, el, sprite, bubble, x: npc.start.x, y: npc.start.y, vx, vy };
+        return { npc, el, sprite, bubble, x: pos.x, y: pos.y, vx, vy };
       });
 
       function tick() {
@@ -247,22 +311,36 @@
             s.x = nextX;
             s.y = nextY;
           } else {
-            // 貼牆滑行檢測：先試著只動 X 或只動 Y，讓小人在斜橋上也能順暢滑行轉彎
-            if (isWalkable(nextX, s.y)) {
-              s.x = nextX;
-              s.vy = -s.vy;
-            } else if (isWalkable(s.x, nextY)) {
-              s.y = nextY;
-              s.vx = -s.vx;
-            } else {
-              // 撞到角落時給予隨機微偏轉反彈，徹底避免卡死
-              const turn = (Math.random() * 0.8 + 0.6) * Math.PI;
-              const cos = Math.cos(turn), sin = Math.sin(turn);
-              const nvx = s.vx * cos - s.vy * sin;
-              const nvy = s.vx * sin + s.vy * cos;
-              s.vx = nvx;
-              s.vy = nvy;
+            const curAngle = Math.atan2(s.vy, s.vx);
+            let bestAngle = curAngle + Math.PI;
+            let maxClearSteps = 0;
+
+            for (let i = 0; i < 16; i++) {
+              const testAngle = (i / 16) * Math.PI * 2;
+              const diff = Math.abs(Math.atan2(Math.sin(testAngle - curAngle), Math.cos(testAngle - curAngle)));
+              if (diff > Math.PI * 0.85) continue;
+
+              const tvx = Math.cos(testAngle) * s.npc.speed;
+              const tvy = Math.sin(testAngle) * s.npc.speed;
+
+              let steps = 0;
+              for (let step = 1; step <= 45; step++) {
+                if (isWalkable(s.x + tvx * step, s.y + tvy * step)) {
+                  steps++;
+                } else {
+                  break;
+                }
+              }
+
+              const score = steps + Math.random() * 4;
+              if (steps >= 4 && score > maxClearSteps) {
+                maxClearSteps = score;
+                bestAngle = testAngle;
+              }
             }
+
+            s.vx = Math.cos(bestAngle) * s.npc.speed;
+            s.vy = Math.sin(bestAngle) * s.npc.speed;
             s.sprite.style.transform = s.vx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
           }
 

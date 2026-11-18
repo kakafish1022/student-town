@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>數學奇幻小鎮 - 城鎮中心大廳</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+  <style>
+    body { background: #120d0a; color: #f3e5ab; margin: 0; overflow: hidden; font-family: sans-serif; user-select: none; }
+    .rpg-panel { background: linear-gradient(145deg, #2b1d14, #1c120c); border: 3px solid #c89d54; box-shadow: 0 10px 25px rgba(0,0,0,0.85); }
+    .rpg-btn { background: linear-gradient(180deg, #e5b567, #b88232); border: 2px solid #fff2cc; color: #231409; font-weight: 900; }
+    .hotspot { position: absolute; cursor: pointer; border-radius: 8px; transition: background 0.2s, box-shadow 0.2s; }
+    .hotspot:hover { background: rgba(255, 223, 100, 0.2); box-shadow: 0 0 15px rgba(255, 215, 0, 0.6); }
+    .hotspot-label { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(25,16,10,0.92); border: 1.5px solid #e5b567; color: #ffea9f; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+    .hotspot:hover .hotspot-label { opacity: 1; }
+  </style>
+</head>
+<body class="w-screen h-screen flex items-center justify-center relative">
+  <img id="img-hall" src="town_hall.png" alt="城鎮中心" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <div id="hall-layer" class="absolute"></div>
+
+  <!-- 頂部導覽 -->
+  <div class="absolute top-3 left-3 right-3 flex justify-between items-center pointer-events-none z-20">
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl text-sm font-bold text-amber-200">
+      🏛️ 城鎮中心大廳 ｜ 🪙 <span id="hud-gold">0</span> 🪵 <span id="hud-wood">0</span> 🪨 <span id="hud-stone">0</span>
+    </div>
+    <button onclick="window.location.href='town.html'" class="pointer-events-auto rpg-btn px-4 py-2 rounded-xl text-sm cursor-pointer">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
+
+  <!-- 1. 中央沙盤：建築升級 -->
+  <div id="modal-sandbox" class="hidden fixed inset-0 bg-black/80 z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel w-full max-w-2xl p-6 rounded-2xl">
+      <div class="flex justify-between items-center border-b border-amber-700 pb-3 mb-4">
+        <h2 class="text-xl font-black text-amber-300">🗺️ 城鎮建築升級沙盤</h2>
+        <button onclick="closeModal('modal-sandbox')" class="text-amber-300 font-bold text-lg cursor-pointer">✖</button>
+      </div>
+      <div class="bg-stone-900/80 p-3 rounded-xl mb-4 text-xs border border-amber-800 text-amber-100/90">
+        全鎮 6 棟建築皆達 <b class="text-amber-300">Lv.2</b> 進化為石造繁榮鎮；皆達 <b class="text-cyan-300">Lv.3</b> 進化為黃金水晶之都！
+      </div>
+      <div id="upgrade-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[55vh] overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 2. 左側榮譽榜 -->
+  <div id="modal-rank" class="hidden fixed inset-0 bg-black/80 z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel w-full max-w-xl p-6 rounded-2xl">
+      <div class="flex justify-between items-center border-b border-amber-700 pb-3 mb-4">
+        <h2 class="text-xl font-black text-amber-300">🏆 全班城鎮繁榮榮譽榜</h2>
+        <button onclick="closeModal('modal-rank')" class="text-amber-300 font-bold text-lg cursor-pointer">✖</button>
+      </div>
+      <div id="rank-list" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- 3. 右側村長櫃檯（唯讀冒險者證書 ＋ 手動存檔 ＋ 登出） -->
+  <div id="modal-counter" class="hidden fixed inset-0 bg-black/80 z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel w-full max-w-lg p-6 rounded-2xl">
+      <div class="flex justify-between items-center border-b border-amber-700 pb-3 mb-4">
+        <h2 class="text-xl font-black text-amber-300">📜 村長書記官櫃檯</h2>
+        <button onclick="closeModal('modal-counter')" class="text-amber-300 font-bold text-lg cursor-pointer">✖</button>
+      </div>
+      <div class="bg-stone-900/90 p-4 rounded-xl border border-amber-800 mb-4 text-sm space-y-2">
+        <div>冒險者：<b class="text-amber-300" id="prof-name"></b></div>
+        <div>累計答對：<b class="text-emerald-300" id="prof-correct">0</b> 題</div>
+        <div class="text-xs text-amber-200/70 pt-2 border-t border-stone-700">
+          💡 提示：暱稱與 4 位數密碼於註冊時已鎖定，若忘記密碼或需修正資料，請舉手洽詢老師從後台協助。
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button onclick="saveToCloud(true)" class="rpg-btn py-2.5 rounded-xl text-sm cursor-pointer">💾 手動雲端存檔</button>
+        <button onclick="logout()" class="bg-red-900 hover:bg-red-800 border border-red-400 text-red-100 font-bold py-2.5 rounded-xl text-sm cursor-pointer">🚪 登出 / 切換帳號</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const player = getPlayerSession();
+    if (!player) window.location.href = 'index.html';
+
+    // 正式寫死大廳 4 大互動熱區座標
+    const HALL_HOTSPOTS = [
+      { id: "sandbox", name: "🗺️ 建築升級沙盤",   left: 38.4, top: 41.7, width: 25.6, height: 24.3 },
+      { id: "rank",    name: "🏆 全班榮譽榜",     left: 9.0,  top: 15.0, width: 22.0, height: 34.0 },
+      { id: "counter", name: "📜 村長書記官櫃檯", left: 72.3, top: 19.4, width: 13.8, height: 26.3 },
+      { id: "exit",    name: "🚪 返回小鎮地圖",   left: 10.0, top: 78.0, width: 22.8, height: 21.3 }
+    ];
+
+    const META = { tavern: "🍺 冒險者酒館", hall: "🏛️ 城鎮中心", alchemy: "⚗️ 魔法煉金室", fountain: "⛲ 中央許願池", board: "📋 村莊佈告欄", ranch: "🐾 寵物牧場" };
+
+    function updateHUD() {
+      document.getElementById('hud-gold').textContent = player.gold;
+      document.getElementById('hud-wood').textContent = player.wood;
+      document.getElementById('hud-stone').textContent = player.stone;
+      document.getElementById('prof-name').textContent = `${player.nickname} (${player.studentId})`;
+      document.getElementById('prof-correct').textContent = player.stats.correct;
+    }
+    updateHUD();
+
+    initHotspotLayer('img-hall', 'hall-layer', HALL_HOTSPOTS, (item) => {
+      if (item.id === 'exit') window.location.href = 'town.html';
+      if (item.id === 'sandbox') openSandbox();
+      if (item.id === 'rank') openRank();
+      if (item.id === 'counter') document.getElementById('modal-counter').classList.remove('hidden');
+    });
+
+    function openSandbox() {
+      const box = document.getElementById('upgrade-list');
+      box.innerHTML = Object.keys(META).map(k => {
+        const lv = player.buildings[k] || 1;
+        const max = lv >= 3;
+        return `
+          <div class="bg-stone-900/90 border border-amber-700 p-3 rounded-xl">
+            <div class="flex justify-between mb-1"><b class="text-amber-200">${META[k]}</b><span class="text-xs bg-amber-900 px-2 rounded">Lv.${lv}/3</span></div>
+            <div class="text-xs text-stone-300 mb-2">${max ? '✨ 已滿級' : `需求：🪙${lv*100} 🪵${lv*60} 🪨${lv*40}`}</div>
+            <button onclick="upgrade('${k}')" ${max ? 'disabled' : ''} class="${max ? 'bg-stone-700 text-stone-400' : 'rpg-btn cursor-pointer'} w-full py-1.5 rounded text-xs">${max ? '已達上限' : '🔨 升級'}</button>
+          </div>`;
+      }).join('');
+      document.getElementById('modal-sandbox').classList.remove('hidden');
+    }
+
+    function upgrade(k) {
+      const lv = player.buildings[k] || 1;
+      if (lv >= 3 || player.gold < lv*100 || player.wood < lv*60 || player.stone < lv*40) return alert("資源不足喔！快去冒險者酒館賺取資源吧！");
+      const oldMin = Math.min(...Object.values(player.buildings));
+      player.gold -= lv*100; player.wood -= lv*60; player.stone -= lv*40;
+      player.buildings[k] = lv + 1;
+      savePlayerSession(player);
+      updateHUD(); openSandbox(); saveToCloud(false);
+      const newMin = Math.min(...Object.values(player.buildings));
+      if (newMin > oldMin) alert(`🎉 恭喜！全鎮 6 棟建築皆已達成 Lv.${newMin}！返回小鎮地圖即可看到城鎮大進化！`);
+    }
+
+    function openRank() {
+      const ranks = JSON.parse(sessionStorage.getItem('math_town_rank') || '[]');
+      document.getElementById('rank-list').innerHTML = ranks.length
+        ? ranks.map((r, i) => `<div class="flex justify-between bg-stone-900 px-4 py-2 rounded-xl border border-amber-800 text-sm"><span>#${i+1} <b>${r.nickname}</b> (${r.classNum}班)</span><span class="text-amber-400 font-bold">${r.prosperity} 分</span></div>`).join('')
+        : `<div class="text-center text-sm text-stone-400 py-4">目前尚無雲端排行資料</div>`;
+      document.getElementById('modal-rank').classList.remove('hidden');
+    }
+
+    async function saveToCloud(manual) {
+      if (!GAS_API_URL) return manual && alert("尚未設定 GAS_API_URL！");
+      await fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProgress', player }) });
+      if (manual) alert("✅ 雲端存檔成功！");
+    }
+
+    function logout() {
+      sessionStorage.clear();
+      window.location.href = 'index.html';
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+  </script>
+</body>
+</html>

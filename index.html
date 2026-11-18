@@ -8,40 +8,134 @@
   <script src="config.js"></script>
   <style>
     body { background: #120d0a; color: #f3e5ab; margin: 0; overflow: hidden; font-family: sans-serif; }
-    .rpg-panel { background: linear-gradient(145deg, #2b1d14, #1c120c); border: 3px solid #c89d54; box-shadow: 0 10px 25px rgba(0,0,0,0.85); }
+    .rpg-panel { background: rgba(28, 18, 12, 0.94); border: 3px solid #c89d54; box-shadow: 0 12px 30px rgba(0,0,0,0.9); }
     .rpg-btn { background: linear-gradient(180deg, #e5b567, #b88232); border: 2px solid #fff2cc; color: #231409; font-weight: 900; }
     .tab-active { background: #c89d54; color: #1c120c; font-weight: 900; }
-    .tab-inactive { background: #1c120c; color: #c89d54; }
+    .tab-inactive { background: #140c08; color: #c89d54; }
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
   <img src="start_bg.png" alt="起始封面" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
 
-  <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-4">
-    <h1 class="text-4xl md:text-5xl font-black text-amber-200 tracking-wider mb-5 drop-shadow-[0_4px_6px_rgba(0,0,0,0.95)]" style="-webkit-text-stroke: 1.5px #3d220a;">
-      ⚔️ 數學奇幻小鎮 🏰
-    </h1>
-
+  <div class="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
     <div class="rpg-panel pointer-events-auto w-full max-w-md p-6 rounded-2xl">
+      
+      <!-- 標題放進框框最上方，清晰不花眼 -->
+      <h1 class="text-2xl md:text-3xl font-black text-center text-amber-300 tracking-wider pb-3 mb-4 border-b-2 border-amber-700/70 drop-shadow">
+        ⚔️ 數學奇幻小鎮 🏰
+      </h1>
+
       <!-- 分頁切換標籤 -->
       <div class="grid grid-cols-2 rounded-xl overflow-hidden border-2 border-amber-600 mb-4 text-sm">
-        <button id="tab-login" onclick="switchMode('login')" class="tab-active py-2 cursor-pointer transition">
+        <button id="tab-login" type="button" onclick="switchMode('login')" class="tab-active py-2 cursor-pointer transition">
           🔑 已有帳號登入
         </button>
-        <button id="tab-register" onclick="switchMode('register')" class="tab-inactive py-2 cursor-pointer transition">
+        <button id="tab-register" type="button" onclick="switchMode('register')" class="tab-inactive py-2 cursor-pointer transition">
           ✨ 首次報到註冊
         </button>
       </div>
 
+      <!-- 班級與座號 -->
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label class="block text-xs text-amber-200/80 mb-1">班級 (如 701)</label>
+          <label class="block text-xs text-amber-200/90 mb-1">班級 (如 701)</label>
           <input id="input-class" type="text" maxlength="3" placeholder="701" class="w-full px-3 py-2 rounded bg-stone-900 border border-amber-600 text-amber-100" />
         </div>
         <div>
-          <label class="block text-xs text-amber-200/80 mb-1">座號 (如 01)</label>
+          <label class="block text-xs text-amber-200/90 mb-1">座號 (如 01)</label>
           <input id="input-seat" type="text" maxlength="2" placeholder="01" class="w-full px-3 py-2 rounded bg-stone-900 border border-amber-600 text-amber-100" />
         </div>
       </div>
 
-      <!-- 僅在「首次
+      <!-- 暱稱（僅首次註冊顯示） -->
+      <div id="nickname-field" class="hidden mb-3">
+        <label class="block text-xs text-amber-200/90 mb-1">冒險者暱稱 <span class="text-rose-400">(設定後不可自行更改)</span></label>
+        <input id="input-nickname" type="text" maxlength="12" placeholder="請輸入帥氣暱稱 (限12字)" class="w-full px-3 py-2 rounded bg-stone-900 border border-amber-600 text-amber-100" />
+      </div>
+
+      <!-- 4 位數密碼輸入框 -->
+      <div class="mb-4">
+        <label class="block text-xs text-amber-200/90 mb-1" id="pin-label">4 位數冒險密碼</label>
+        <input id="input-pin" type="password" maxlength="4" placeholder="請輸入4位純數字" class="w-full px-3 py-2 rounded bg-stone-900 border border-amber-600 text-amber-100 tracking-widest text-center text-lg" />
+      </div>
+
+      <div id="auth-msg" class="text-xs text-red-400 text-center min-h-[20px] mb-3 font-bold"></div>
+
+      <button type="button" onclick="submitAuth()" id="btn-submit" class="rpg-btn w-full py-3 rounded-xl text-lg shadow-lg cursor-pointer">
+        ▶ 讀取存檔並進入小鎮
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let authMode = 'login';
+
+    function switchMode(mode) {
+      authMode = mode;
+      document.getElementById('auth-msg').textContent = '';
+      if (mode === 'login') {
+        document.getElementById('tab-login').className = 'tab-active py-2 cursor-pointer transition';
+        document.getElementById('tab-register').className = 'tab-inactive py-2 cursor-pointer transition';
+        document.getElementById('nickname-field').classList.add('hidden');
+        document.getElementById('pin-label').textContent = '4 位數冒險密碼';
+        document.getElementById('btn-submit').textContent = '▶ 讀取存檔並進入小鎮';
+      } else {
+        document.getElementById('tab-login').className = 'tab-inactive py-2 cursor-pointer transition';
+        document.getElementById('tab-register').className = 'tab-active py-2 cursor-pointer transition';
+        document.getElementById('nickname-field').classList.remove('hidden');
+        document.getElementById('pin-label').innerHTML = '自設 4 位數密碼 <span class="text-rose-400">(請務必記牢！)</span>';
+        document.getElementById('btn-submit').textContent = '✨ 建立新角色並進入小鎮';
+      }
+    }
+
+    async function submitAuth() {
+      const classNum = document.getElementById('input-class').value.trim();
+      const seatNum = document.getElementById('input-seat').value.trim().padStart(2, '0');
+      const nickname = document.getElementById('input-nickname').value.trim();
+      const pinCode = document.getElementById('input-pin').value.trim();
+      const msgEl = document.getElementById('auth-msg');
+      const btn = document.getElementById('btn-submit');
+
+      if (!classNum || !seatNum || !pinCode) {
+        msgEl.textContent = "請完整填寫所有欄位！";
+        return;
+      }
+      if (authMode === 'register' && !nickname) {
+        msgEl.textContent = "首次報到請務必輸入冒險者暱稱！";
+        return;
+      }
+      if (typeof GAS_API_URL === 'undefined' || !GAS_API_URL || GAS_API_URL.includes("貼在這裡")) {
+        msgEl.textContent = "⚠️ 尚未在 config.js 正確設定 GAS 網址！";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = authMode === 'login' ? "⏳ 讀取存檔中..." : "⏳ 正在向公會註冊角色...";
+      msgEl.textContent = "";
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: authMode, classNum, seatNum, nickname, pinCode })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          savePlayerSession(data.player);
+          sessionStorage.setItem('math_town_ann', JSON.stringify(data.announcement || {}));
+          sessionStorage.setItem('math_town_msgs', JSON.stringify(data.messages || []));
+          sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard || []));
+          window.location.href = 'town.html';
+        } else {
+          msgEl.textContent = data.message || "操作失敗，請檢查輸入內容";
+        }
+      } catch (e) {
+        msgEl.textContent = "連線失敗，請確認 GAS 網址是否正確。";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = authMode === 'login' ? "▶ 讀取存檔並進入小鎮" : "✨ 建立新角色並進入小鎮";
+      }
+    }
+  </script>
+</body>
+</html>

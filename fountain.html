@@ -21,7 +21,7 @@
   <img id="img-fountain" src="fountain.png" alt="中央許願池" class="w-full h-full object-contain" />
   <div id="fountain-layer" class="absolute"></div>
 
-  <!-- 右上角資源狀態列（不遮擋左上角圖上的「返回小鎮」木牌） -->
+  <!-- 右上角資源狀態列 -->
   <div class="absolute top-3 right-3 pointer-events-none z-20">
     <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-4 text-sm">
       <span class="text-amber-400 font-black" id="hud-name">勇者</span>
@@ -31,12 +31,11 @@
     </div>
   </div>
 
-  <!-- 結果回饋浮動卡片（簽到進度條 & 女神詩籤共用） -->
+  <!-- 結果回饋浮動卡片 -->
   <div id="fountain-result" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 rpg-panel px-6 py-4 rounded-2xl max-w-md w-[90%] text-center z-40">
     <div id="fountain-res-badge" class="inline-block px-3 py-0.5 rounded-full text-xs font-black bg-amber-500 text-stone-950 mb-1.5">每日簽到</div>
     <h3 id="fountain-res-title" class="text-lg font-black text-amber-300 mb-1">標題</h3>
     <p id="fountain-res-desc" class="text-sm text-amber-100 leading-relaxed mb-3">內容</p>
-    <!-- 7日簽到進度格子 -->
     <div id="streak-bar" class="hidden grid grid-cols-7 gap-1.5 mb-3 text-xs font-black"></div>
     <button onclick="document.getElementById('fountain-result').classList.add('hidden')" class="rpg-btn px-5 py-1.5 rounded-lg text-xs cursor-pointer">收下祝福</button>
   </div>
@@ -44,6 +43,8 @@
   <script>
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
+
+    let isRequesting = false; // 防止連點重複發送請求
 
     function updateHUD() {
       document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
@@ -53,7 +54,6 @@
     }
     updateHUD();
 
-    // 精準對齊 fountain.png 圖面上的三個互動物件熱區
     const FOUNTAIN_HOTSPOTS = [
       { id: "back",    name: "↩ 返回小鎮",                            left: 3.2,  top: 4.0,  width: 17.0, height: 9.0  },
       { id: "goddess", name: "🔮 智慧女神像・抽取今日祝福籤",          left: 14.0, top: 11.0, width: 22.0, height: 63.0 },
@@ -91,102 +91,83 @@
       document.getElementById('fountain-result').classList.remove('hidden');
     }
 
-    // === 1. 許願池每日簽到（支援雲端 GAS 與尚未更新 GAS 自動降級測試） ===
-    function localWishFallback() {
-      const today = new Date().toISOString().slice(0, 10);
-      const localKey = `wish_${player.studentId}`;
-      const localData = JSON.parse(localStorage.getItem(localKey) || '{"date":"","streak":0}');
-
-      if (localData.date === today) {
-        showFountainCard("⛲ 許願池已祈福", "今天已經簽到過囉，明天再來吧！", `本週累積進度：${localData.streak}/7 天（第4天與第7天有大獎！）`, localData.streak);
-        return;
-      }
-      const streak = localData.streak >= 7 ? 1 : localData.streak + 1;
-      localStorage.setItem(localKey, JSON.stringify({ date: today, streak }));
-      const mult = streak === 7 ? 6 : streak === 4 ? 3 : 1;
-      player.gold += 15 * mult; player.wood += 5 * mult; player.stone += 5 * mult;
-      sessionStorage.setItem('math_town_player', JSON.stringify(player));
-      updateHUD();
-      showFountainCard(
-        `✨ 第 ${streak}/7 日簽到成功！`,
-        streak === 7 ? "👑 7日滿貫超級大獎！" : streak === 4 ? "🌟 4日累積星輝大獎！" : "每日水靈祝福",
-        `獲得 🪙 +${15 * mult}、🪵 +${5 * mult}、🪨 +${5 * mult}`,
-        streak
-      );
-    }
-
+    // === 1. 許願池每日簽到（嚴格連線 GAS 寫入試算表統計） ===
     async function wishAtFountain() {
-      if (GAS_API_URL) {
-        try {
-          const res = await fetch(GAS_API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'dailySign', studentId: player.studentId })
-          }).then(r => r.json());
-
-          if (res && (res.success || res.alreadySigned)) {
-            if (!res.success) {
-              showFountainCard("⛲ 許願池已祈福", "今日已領取過水靈祝福囉！", `本週累積進度：${res.streak}/7 天（第4天與第7天有大獎！）`, res.streak);
-              return;
-            }
-            player.gold = res.totals.gold;
-            player.wood = res.totals.wood;
-            player.stone = res.totals.stone;
-            sessionStorage.setItem('math_town_player', JSON.stringify(player));
-            updateHUD();
-            showFountainCard(`✨ 第 ${res.streak}/7 日簽到成功！`, res.rewardTitle, `獲得 🪙 +${res.reward.gold}、🪵 +${res.reward.wood}、🪨 +${res.reward.stone}`, res.streak);
-            return;
-          }
-        } catch (e) {}
-      }
-      localWishFallback();
-    }
-
-    // === 2. 智慧女神像每日求籤（純詩籤無資源，每日限一次） ===
-    function localGoddessFallback() {
-      const today = new Date().toISOString().slice(0, 10);
-      const localKey = `fortune_${player.studentId}`;
-      const samples = [
-        { level: "大吉", poem: "星辰照亮你的草稿紙，今天連最難的應用題都會主動告訴你答案！" },
-        { level: "中吉", poem: "穩紮穩打如老村長的石橋，只要看清楚正負號，好運就會一路相隨。" },
-        { level: "小吉", poem: "微風拂過許願池，下課記得起來伸展一下，靈感就會悄悄降臨喔！" },
-        { level: "小凶", poem: "小心計算粗心的小惡魔出沒！寫完考卷多檢查一分鐘就能化解危機。" },
-        { level: "大凶", poem: "今日水逆警報！建議先去摸摸小橘貓轉運，寫作業千萬別跳步驟喔！" }
-      ];
-      const pick = samples[Math.floor(Math.random() * samples.length)];
-      localStorage.setItem(localKey, JSON.stringify({ date: today, ...pick }));
-      showFountainCard("🔮 智慧女神的今日祝福", `【${pick.level}】`, pick.poem, null);
-    }
-
-    async function prayToGoddess() {
-      const today = new Date().toISOString().slice(0, 10);
-      const localKey = `fortune_${player.studentId}`;
-      const saved = JSON.parse(localStorage.getItem(localKey) || 'null');
-
-      if (saved && saved.date === today) {
-        showFountainCard("🔮 今日女神神諭（已求籤）", `【${saved.level}】`, saved.poem, null);
+      if (isRequesting) return;
+      if (!GAS_API_URL) {
+        showFountainCard("⚠️ 系統設定提醒", "尚未設定後端連線網址", "請檢查 config.js 中的 GAS_API_URL。", null);
         return;
       }
 
-      if (GAS_API_URL) {
-        try {
-          showFountainCard("🔮 智慧女神感應星辰中...", "請稍候", "水晶球正在為你凝聚今日神諭...", null);
-          const res = await fetch(GAS_API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'drawFortune', studentId: player.studentId, nickname: player.nickname })
-          }).then(r => r.json());
+      isRequesting = true;
+      showFountainCard("⛲ 許願池感應中...", "正在向王國登錄今日簽到", "請稍候，水靈正在凝聚祝福資源...", null);
 
-          if (res && (res.success || res.alreadyDrawn)) {
-            if (res.success) {
-              localStorage.setItem(localKey, JSON.stringify({ date: today, level: res.level, poem: res.poem }));
-              showFountainCard("🔮 智慧女神的今日祝福", `【${res.level}】`, res.poem, null);
-            } else {
-              showFountainCard("🔮 智慧女神提示", "今日已揭示過神諭", res.message, null);
-            }
-            return;
-          }
-        } catch (e) {}
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'dailySign', studentId: player.studentId })
+        }).then(r => r.json());
+
+        if (res.success) {
+          player.gold = res.totals.gold;
+          player.wood = res.totals.wood;
+          player.stone = res.totals.stone;
+          sessionStorage.setItem('math_town_player', JSON.stringify(player));
+          updateHUD();
+          showFountainCard(
+            `✨ 第 ${res.streak}/7 日簽到成功！`,
+            res.rewardTitle,
+            `獲得 🪙 +${res.reward.gold}、🪵 +${res.reward.wood}、🪨 +${res.reward.stone}（已同步至雲端存檔）`,
+            res.streak
+          );
+        } else if (res.alreadySigned) {
+          showFountainCard(
+            "⛲ 許願池已祈福",
+            "今天已經領取過水靈祝福囉！",
+            `本週累積進度：${res.streak}/7 天（第4天與第7天有大獎，明天再來吧！）`,
+            res.streak
+          );
+        } else {
+          showFountainCard("⚠️ 簽到未完成", "後端回傳異常", res.message || "請確認已重新部署最新版 Apps Script。", null);
+        }
+      } catch (err) {
+        showFountainCard("❌ 雲端連線失敗", "本次簽到未計入統計", "網路不穩或後端尚未更新，請重新整理後再試一次！", null);
+      } finally {
+        isRequesting = false;
       }
-      localGoddessFallback();
+    }
+
+    // === 2. 智慧女神像每日求籤（嚴格連線 GAS 讀取「詩籤庫」或 AI 生成） ===
+    async function prayToGoddess() {
+      if (isRequesting) return;
+      if (!GAS_API_URL) {
+        showFountainCard("⚠️ 系統設定提醒", "尚未設定後端連線網址", "請檢查 config.js 中的 GAS_API_URL。", null);
+        return;
+      }
+
+      isRequesting = true;
+      showFountainCard("🔮 智慧女神感應星辰中...", "請稍候", "水晶球正在為你揭示今日神諭...", null);
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ action: 'drawFortune', studentId: player.studentId, nickname: player.nickname })
+        }).then(r => r.json());
+
+        if (res.success) {
+          showFountainCard("🔮 智慧女神的今日祝福", `【${res.level}】`, res.poem, null);
+        } else if (res.alreadyDrawn) {
+          showFountainCard("🔮 智慧女神提示", "今日已揭示過神諭", res.message, null);
+        } else {
+          showFountainCard("⚠️ 求籤未完成", "後端回傳異常", res.message || "請確認已重新部署最新版 Apps Script。", null);
+        }
+      } catch (err) {
+        showFountainCard("❌ 雲端連線失敗", "無法讀取神諭", "網路不穩或後端尚未更新，請重新整理後再試一次！", null);
+      } finally {
+        isRequesting = false;
+      }
     }
   </script>
 </body>

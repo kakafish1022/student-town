@@ -9,6 +9,11 @@
   <style>
     body { background: #120d0a; color: #f3e5ab; margin: 0; overflow: hidden; font-family: sans-serif; user-select: none; }
     .rpg-panel { background: linear-gradient(145deg, #2b1d14, #1c120c); border: 3px solid #c89d54; box-shadow: 0 10px 25px rgba(0,0,0,0.85); }
+    .oracle-scroll {
+      background: radial-gradient(circle at top, #3b2718 0%, #22150d 65%, #160d08 100%);
+      border: 3px solid #e5b567;
+      box-shadow: 0 0 35px rgba(255, 215, 100, 0.35), 0 18px 40px rgba(0, 0, 0, 0.9);
+    }
     .rpg-btn { background: linear-gradient(180deg, #e5b567, #b88232); border: 2px solid #fff2cc; color: #231409; font-weight: 900; }
     .hotspot { position: absolute; cursor: pointer; border-radius: 12px; transition: background 0.2s, box-shadow 0.2s; z-index: 10; }
     .hotspot:hover { background: rgba(255, 223, 100, 0.18); box-shadow: 0 0 18px rgba(255, 215, 0, 0.55); }
@@ -31,7 +36,7 @@
     </div>
   </div>
 
-  <!-- 結果回饋浮動卡片 -->
+  <!-- 1. 許願池每日簽到結果卡片（下方進度條橫幅） -->
   <div id="fountain-result" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 rpg-panel px-6 py-4 rounded-2xl max-w-md w-[90%] text-center z-40">
     <div id="fountain-res-badge" class="inline-block px-3 py-0.5 rounded-full text-xs font-black bg-amber-500 text-stone-950 mb-1.5">每日簽到</div>
     <h3 id="fountain-res-title" class="text-lg font-black text-amber-300 mb-1">標題</h3>
@@ -40,11 +45,43 @@
     <button onclick="document.getElementById('fountain-result').classList.add('hidden')" class="rpg-btn px-5 py-1.5 rounded-lg text-xs cursor-pointer">收下祝福</button>
   </div>
 
+  <!-- 2. 智慧女神神諭卷軸大彈窗（與左側智慧女神像等大，可容納長篇詩籤） -->
+  <div id="oracle-modal" class="hidden fixed inset-0 bg-black/55 z-40 flex items-center justify-center p-4">
+    <div class="oracle-scroll w-full max-w-lg min-h-[64vh] max-h-[82vh] rounded-3xl p-6 md:p-8 flex flex-col justify-between text-center relative">
+      <!-- 頂部裝飾與狀態標籤 -->
+      <div>
+        <div class="text-3xl mb-1">🔮</div>
+        <span id="oracle-badge" class="inline-block px-3.5 py-1 rounded-full text-xs font-black bg-amber-500/90 text-stone-950 tracking-wider mb-3">
+          智慧女神的今日神諭
+        </span>
+        <h2 id="oracle-level" class="text-3xl md:text-4xl font-black text-amber-300 tracking-widest drop-shadow mb-3">
+          【大吉】
+        </h2>
+        <div class="w-28 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto"></div>
+      </div>
+
+      <!-- 中央詩籤內容展示區（大字體、寬敞可捲動） -->
+      <div class="my-4 flex-1 flex items-center justify-center overflow-y-auto px-2">
+        <p id="oracle-poem" class="text-base md:text-xl text-amber-100 font-bold leading-loose whitespace-pre-line tracking-wide">
+          水晶球正在凝聚星辰之力...
+        </p>
+      </div>
+
+      <!-- 底部收起按鈕 -->
+      <div class="pt-2 border-t border-amber-500/30">
+        <p class="text-[11px] text-amber-300/70 mb-3">✨ 每位冒險者每日限求籤一次，點擊女神像可隨時重溫今日神諭</p>
+        <button onclick="document.getElementById('oracle-modal').classList.add('hidden')" class="rpg-btn px-8 py-2.5 rounded-xl text-sm cursor-pointer shadow-lg">
+          謹記女神教誨
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
-    let isRequesting = false; // 防止連點重複發送請求
+    let isRequesting = false;
 
     function updateHUD() {
       document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
@@ -56,7 +93,7 @@
 
     const FOUNTAIN_HOTSPOTS = [
       { id: "back",    name: "↩ 返回小鎮",                            left: 3.2,  top: 4.0,  width: 17.0, height: 9.0  },
-      { id: "goddess", name: "🔮 智慧女神像・抽取今日祝福籤",          left: 14.0, top: 11.0, width: 22.0, height: 63.0 },
+      { id: "goddess", name: "🔮 智慧女神像・查看今日祝福籤",          left: 14.0, top: 11.0, width: 22.0, height: 63.0 },
       { id: "pool",    name: "✨ 中央許願池・點擊池水進行每日簽到",    left: 44.0, top: 24.0, width: 51.0, height: 54.0 }
     ];
 
@@ -82,6 +119,7 @@
     }
 
     function showFountainCard(badge, title, desc, streak) {
+      document.getElementById('oracle-modal').classList.add('hidden');
       document.getElementById('fountain-res-badge').textContent = badge;
       document.getElementById('fountain-res-title').textContent = title;
       document.getElementById('fountain-res-desc').textContent = desc;
@@ -91,7 +129,15 @@
       document.getElementById('fountain-result').classList.remove('hidden');
     }
 
-    // === 1. 許願池每日簽到（嚴格連線 GAS 寫入試算表統計） ===
+    function showOracleScroll(badge, level, poem) {
+      document.getElementById('fountain-result').classList.add('hidden');
+      document.getElementById('oracle-badge').textContent = badge;
+      document.getElementById('oracle-level').textContent = `【${level}】`;
+      document.getElementById('oracle-poem').textContent = poem;
+      document.getElementById('oracle-modal').classList.remove('hidden');
+    }
+
+    // === 1. 許願池每日簽到 ===
     async function wishAtFountain() {
       if (isRequesting) return;
       if (!GAS_API_URL) {
@@ -138,7 +184,7 @@
       }
     }
 
-    // === 2. 智慧女神像每日求籤（嚴格連線 GAS 讀取「詩籤庫」或 AI 生成） ===
+    // === 2. 智慧女神像每日求籤（當天抽過直接顯示當天抽到的籤詩） ===
     async function prayToGoddess() {
       if (isRequesting) return;
       if (!GAS_API_URL) {
@@ -147,7 +193,7 @@
       }
 
       isRequesting = true;
-      showFountainCard("🔮 智慧女神感應星辰中...", "請稍候", "水晶球正在為你揭示今日神諭...", null);
+      showOracleScroll("🔮 智慧女神感應星辰中...", "祈福中", "水晶球正在為你凝聚今日神諭，請稍候...");
 
       try {
         const res = await fetch(GAS_API_URL, {
@@ -157,14 +203,13 @@
         }).then(r => r.json());
 
         if (res.success) {
-          showFountainCard("🔮 智慧女神的今日祝福", `【${res.level}】`, res.poem, null);
-        } else if (res.alreadyDrawn) {
-          showFountainCard("🔮 智慧女神提示", "今日已揭示過神諭", res.message, null);
+          const badgeText = res.alreadyDrawn ? "📜 今日已求籤・神諭重現" : "🔮 智慧女神的今日神諭";
+          showOracleScroll(badgeText, res.level, res.poem);
         } else {
-          showFountainCard("⚠️ 求籤未完成", "後端回傳異常", res.message || "請確認已重新部署最新版 Apps Script。", null);
+          showOracleScroll("⚠️ 神諭感應中斷", "提示", res.message || "請確認已重新部署最新版 Apps Script。");
         }
       } catch (err) {
-        showFountainCard("❌ 雲端連線失敗", "無法讀取神諭", "網路不穩或後端尚未更新，請重新整理後再試一次！", null);
+        showOracleScroll("❌ 雲端連線失敗", "斷線", "網路不穩或後端尚未更新，請重新整理後再試一次！");
       } finally {
         isRequesting = false;
       }

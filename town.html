@@ -15,16 +15,16 @@
     .hotspot-label { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(25,16,10,0.92); border: 1.5px solid #e5b567; color: #ffea9f; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
     .hotspot:hover .hotspot-label { opacity: 1; }
 
-    /* 巡邏小人走路上下彈跳動畫 */
+    /* 走路上下微幅彈跳動畫 */
     @keyframes npcBob {
       0%, 100% { transform: translateY(0px); }
-      50% { transform: translateY(-4px); }
+      50% { transform: translateY(-3px); }
     }
     .npc-walker {
       position: absolute;
       z-index: 15;
       cursor: pointer;
-      transition: left 4s linear, top 4s linear;
+      transform: translate(-50%, -85%); /* 腳底對齊道路座標點 */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -32,8 +32,7 @@
     .npc-sprite {
       font-size: 24px;
       filter: drop-shadow(0 3px 2px rgba(0,0,0,0.85));
-      animation: npcBob 0.55s infinite ease-in-out;
-      transition: transform 0.2s;
+      animation: npcBob 0.5s infinite ease-in-out;
     }
     .npc-bubble {
       background: rgba(255, 251, 235, 0.95);
@@ -52,8 +51,6 @@
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
   <img id="img-town" src="home1.png" alt="小鎮地圖" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
-  
-  <!-- 建築熱區與巡邏小人共用同一個對齊底圖比例的圖層 -->
   <div id="town-layer" class="absolute"></div>
 
   <!-- 頂部狀態列 -->
@@ -139,7 +136,7 @@
     document.getElementById('img-town').src = `home${stage}.png`;
     document.getElementById('hud-stage').textContent = stage === 1 ? 'Lv.1 拓荒木屋村' : stage === 2 ? 'Lv.2 石造繁榮鎮' : 'Lv.3 黃金水晶之都';
 
-    const baseRender = initHotspotLayer('img-town', 'town-layer', TOWN_HOTSPOTS, (item) => {
+    initHotspotLayer('img-town', 'town-layer', TOWN_HOTSPOTS, (item) => {
       if (item.url === 'MODAL') {
         openBoard();
       } else if (item.url) {
@@ -150,48 +147,73 @@
       }
     });
 
-    // === 巡邏小人系統（依城鎮等級解鎖更多居民在路上散步） ===
-    const NPC_LIST = [
-      {
-        minStage: 1,
-        icon: "🧙‍♂️",
-        name: "數學老村長",
-        waypoints: [{x: 34, y: 46}, {x: 39, y: 58}, {x: 52, y: 60}, {x: 46, y: 40}],
-        lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "今天算了幾題數學？"]
-      },
-      {
-        minStage: 1,
-        icon: "🐈",
-        name: "小橘貓",
-        waypoints: [{x: 62, y: 68}, {x: 70, y: 74}, {x: 58, y: 78}, {x: 53, y: 68}],
-        lines: ["喵～佈告欄有新留言！", "喵嗚～好想吃魚乾", "摸我一下會有好運喵！"]
-      },
-      {
-        minStage: 2,
-        icon: "🧝‍♀️",
-        name: "精靈學者",
-        waypoints: [{x: 61, y: 44}, {x: 68, y: 55}, {x: 59, y: 58}, {x: 57, y: 42}],
-        lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"]
-      },
-      {
-        minStage: 3,
-        icon: "🛡️",
-        name: "皇家衛兵",
-        waypoints: [{x: 24, y: 52}, {x: 33, y: 65}, {x: 26, y: 72}, {x: 19, y: 60}],
-        lines: ["守護黃金水晶之都！", "你是全班的數學英雄！", "榮譽榜上有你的名字嗎？"]
+    // === 【聯集道路網：環狀廣場 (outer - hole) ∪ 4條斜向石橋通道】 ===
+    const ROAD_UNION = {
+      outerEllipse: { cx: 50.3, cy: 56.9, rx: 22.6, ry: 18.7 },
+      holeEllipse:  { cx: 50.8, cy: 57.2, rx: 18.6, ry: 13.4 },
+      walkPolys: [
+        [{x:11.3, y:88}, {x:37, y:67.7}, {x:39.4, y:70.5}, {x:16, y:92.3}],
+        [{x:14.5, y:92.4}, {x:19.4, y:99.5}, {x:29.2, y:100}, {x:18.1, y:88.7}],
+        [{x:47.1, y:72.7}, {x:86.1, y:99.2}, {x:79.5, y:100}, {x:43.2, y:74.6}],
+        [{x:29.6, y:60.3}, {x:10.6, y:44.6}, {x:9.7, y:40.5}, {x:29.4, y:55.3}]
+      ]
+    };
+
+    // 幾何判斷：點是否在橢圓內
+    function inEllipse(x, y, e) {
+      const dx = (x - e.cx) / e.rx;
+      const dy = (y - e.cy) / e.ry;
+      return (dx * dx + dy * dy) <= 1.0;
+    }
+
+    // 幾何判斷：射線法判斷點是否在任意多邊形內
+    function inPolygon(x, y, poly) {
+      let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const xi = poly[i].x, yi = poly[i].y;
+        const xj = poly[j].x, yj = poly[j].y;
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
       }
+      return inside;
+    }
+
+    // 總聯集判定：只要在「環狀道路」OR「任一石橋多邊形」內，即為安全可行走路面
+    function isWalkable(x, y) {
+      const inRing = inEllipse(x, y, ROAD_UNION.outerEllipse) && !inEllipse(x, y, ROAD_UNION.holeEllipse);
+      if (inRing) return true;
+      for (const poly of ROAD_UNION.walkPolys) {
+        if (inPolygon(x, y, poly)) return true;
+      }
+      return false;
+    }
+
+    const NPC_LIST = [
+      { minStage: 1, icon: "🧙‍♂️", start: {x: 50.3, y: 73.0}, speed: 0.04,  lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "走過石橋去看看風景～"] },
+      { minStage: 1, icon: "🐈",   start: {x: 35.0, y: 69.0}, speed: 0.055, lines: ["喵～佈告欄有新留言！", "喵嗚～追不到我吧！", "摸我一下會有好運喵！"] },
+      { minStage: 2, icon: "🧝‍♀️", start: {x: 69.0, y: 57.0}, speed: 0.045, lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"] },
+      { minStage: 3, icon: "🛡️",   start: {x: 50.3, y: 41.0}, speed: 0.038, lines: ["守護黃金水晶之都！", "你是全班的數學英雄！", "榮譽榜上有你的名字嗎？"] }
     ];
 
+    let npcState = [];
+    let animFrameId = null;
+
     function spawnTownNPCs() {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
       const layer = document.getElementById('town-layer');
+      layer.querySelectorAll('.npc-walker').forEach(el => el.remove());
+
       const activeNPCs = NPC_LIST.filter(n => stage >= n.minStage);
 
-      activeNPCs.forEach((npc, idx) => {
-        let step = 0;
+      npcState = activeNPCs.map((npc, idx) => {
+        const angle = (Math.random() * 0.5 + 0.25) * Math.PI * (idx % 2 === 0 ? 1 : -1);
+        const vx = Math.cos(angle) * npc.speed;
+        const vy = Math.sin(angle) * npc.speed;
+
         const el = document.createElement('div');
         el.className = 'npc-walker';
-        el.style.left = npc.waypoints[0].x + '%';
-        el.style.top = npc.waypoints[0].y + '%';
+        el.style.left = npc.start.x + '%';
+        el.style.top = npc.start.y + '%';
 
         const bubble = document.createElement('div');
         bubble.className = 'npc-bubble hidden';
@@ -200,12 +222,12 @@
         const sprite = document.createElement('div');
         sprite.className = 'npc-sprite';
         sprite.textContent = npc.icon;
+        sprite.style.transform = vx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
 
         el.appendChild(bubble);
         el.appendChild(sprite);
         layer.appendChild(el);
 
-        // 點擊小人講話
         el.addEventListener('click', (e) => {
           e.stopPropagation();
           bubble.textContent = npc.lines[Math.floor(Math.random() * npc.lines.length)];
@@ -213,29 +235,48 @@
           setTimeout(() => bubble.classList.add('hidden'), 3000);
         });
 
-        // 定時沿著道路座標巡邏移動
-        setInterval(() => {
-          const prevX = npc.waypoints[step].x;
-          step = (step + 1) % npc.waypoints.length;
-          const nextPt = npc.waypoints[step];
-          // 根據左右移動方向自動翻轉面向
-          sprite.style.transform = nextPt.x < prevX ? 'scaleX(-1)' : 'scaleX(1)';
-          el.style.left = nextPt.x + '%';
-          el.style.top = nextPt.y + '%';
-
-          // 偶爾自動冒出對話泡泡
-          if (Math.random() < 0.35) {
-            bubble.textContent = npc.lines[Math.floor(Math.random() * npc.lines.length)];
-            bubble.classList.remove('hidden');
-            setTimeout(() => bubble.classList.add('hidden'), 2800);
-          }
-        }, 4200 + idx * 600);
+        return { npc, el, sprite, bubble, x: npc.start.x, y: npc.start.y, vx, vy };
       });
+
+      function tick() {
+        npcState.forEach(s => {
+          const nextX = s.x + s.vx;
+          const nextY = s.y + s.vy;
+
+          if (isWalkable(nextX, nextY)) {
+            s.x = nextX;
+            s.y = nextY;
+          } else {
+            // 貼牆滑行檢測：先試著只動 X 或只動 Y，讓小人在斜橋上也能順暢滑行轉彎
+            if (isWalkable(nextX, s.y)) {
+              s.x = nextX;
+              s.vy = -s.vy;
+            } else if (isWalkable(s.x, nextY)) {
+              s.y = nextY;
+              s.vx = -s.vx;
+            } else {
+              // 撞到角落時給予隨機微偏轉反彈，徹底避免卡死
+              const turn = (Math.random() * 0.8 + 0.6) * Math.PI;
+              const cos = Math.cos(turn), sin = Math.sin(turn);
+              const nvx = s.vx * cos - s.vy * sin;
+              const nvy = s.vx * sin + s.vy * cos;
+              s.vx = nvx;
+              s.vy = nvy;
+            }
+            s.sprite.style.transform = s.vx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+          }
+
+          s.el.style.left = s.x + '%';
+          s.el.style.top = s.y + '%';
+        });
+        animFrameId = requestAnimationFrame(tick);
+      }
+
+      animFrameId = requestAnimationFrame(tick);
     }
 
-    // 視窗縮放重繪熱區後一併重新生成小人
     window.addEventListener('resize', () => setTimeout(spawnTownNPCs, 100));
-    setTimeout(spawnTownNPCs, 300);
+    setTimeout(spawnTownNPCs, 200);
 
     function openBoard() {
       const ann = JSON.parse(sessionStorage.getItem('math_town_ann') || '{}');

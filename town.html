@@ -21,7 +21,7 @@
     }
     .npc-walker {
       position: absolute;
-      z-index: 15;
+      z-index: 30;
       cursor: pointer;
       transform: translate(-50%, -85%);
       display: flex;
@@ -126,14 +126,14 @@
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
-    // === 精準更新後的建築物熱區座標 ===
+    // === 建築物熱區座標（許願池直接連結 fountain.html） ===
     const TOWN_HOTSPOTS = [
-      { id: "hall",     name: "🏛️ 城鎮中心",     url: "hall.html", left: 41.0, top: 15.2, width: 17.0, height: 22.0 },
-      { id: "tavern",   name: "🍺 冒險者酒館",   url: "",          left: 15.7, top: 19.3, width: 13.7, height: 24.6 },
-      { id: "alchemy",  name: "⚗️ 魔法煉金室",   url: "",          left: 67.4, top: 24.6, width: 16.0, height: 21.0 },
-      { id: "fountain", name: "⛲ 中央許願池",   url: "",          left: 43.0, top: 48.0, width: 14.0, height: 14.0 },
-      { id: "board",    name: "📋 村莊佈告欄",   url: "MODAL",     left: 55.4, top: 64.5, width: 7.4,  height: 6.9  },
-      { id: "ranch",    name: "🐾 奇幻寵物牧場", url: "",          left: 78.0, top: 50.5, width: 13.6, height: 22.9 }
+      { id: "hall",     name: "🏛️ 城鎮中心",     url: "hall.html",     left: 41.0, top: 15.2, width: 17.0, height: 22.0 },
+      { id: "tavern",   name: "🍺 冒險者酒館",   url: "",              left: 15.7, top: 19.3, width: 13.7, height: 24.6 },
+      { id: "alchemy",  name: "⚗️ 魔法煉金室",   url: "",              left: 67.4, top: 24.6, width: 16.0, height: 21.0 },
+      { id: "fountain", name: "⛲ 中央許願池",   url: "fountain.html", left: 43.0, top: 48.0, width: 14.0, height: 14.0 },
+      { id: "board",    name: "📋 村莊佈告欄",   url: "MODAL",         left: 55.4, top: 64.5, width: 7.4,  height: 6.9  },
+      { id: "ranch",    name: "🐾 奇幻寵物牧場", url: "",              left: 78.0, top: 50.5, width: 13.6, height: 22.9 }
     ];
 
     document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
@@ -247,7 +247,7 @@
     const NPC_LIST = [
       { minStage: 1, img: "npc1.png", fallbackIcon: "🧙‍♂️", start: {x: 42, y: 71}, speed: 0.038, lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "走過石橋去看看風景～"] },
       { minStage: 1, img: "npc2.png", fallbackIcon: "🐈",   start: {x: 22, y: 84}, speed: 0.052, lines: ["喵～佈告欄有新留言！", "喵嗚～追不到我吧！", "摸我一下會有好運喵！"] },
-      { minStage: 1, img: "npc3.png", fallbackIcon: "🗡️",   start: {x: 68, y: 62}, speed: 0.044, lines: ["準備好挑戰數學任務了嗎？", "聽說酒館快要開張囉！", "一起把小鎮升到 Lv.3 吧！"] },
+      { minStage: 1, img: "npc3.png", fallbackIcon: "🗡️",   start: {x: 68, y: 62}, speed: 0.044, lines: ["今天去許願池簽到了嗎？", "智慧女神今天會抽到什麼籤呢？", "一起把小鎮升到 Lv.3 吧！"] },
       { minStage: 2, img: "npc4.png", fallbackIcon: "🧝‍♀️", start: {x: 28, y: 52}, speed: 0.036, lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"] }
     ];
 
@@ -293,11 +293,25 @@
         layer.appendChild(el);
 
         el.addEventListener('click', (e) => {
+          e.preventDefault();
           e.stopPropagation();
           bubble.textContent = npc.lines[Math.floor(Math.random() * npc.lines.length)];
           bubble.classList.remove('hidden');
-          setTimeout(() => bubble.classList.add('hidden'), 3000);
+          clearTimeout(el._bubbleTimer);
+          el._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 3000);
         });
+
+        const autoTalk = setInterval(() => {
+          if (!document.body.contains(el)) {
+            clearInterval(autoTalk);
+            return;
+          }
+          if (Math.random() < 0.45 && bubble.classList.contains('hidden')) {
+            bubble.textContent = npc.lines[Math.floor(Math.random() * npc.lines.length)];
+            bubble.classList.remove('hidden');
+            el._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 2800);
+          }
+        }, 4500 + idx * 800);
 
         return { npc, el, sprite, bubble, x: pos.x, y: pos.y, vx, vy };
       });
@@ -367,7 +381,7 @@
 
     function petCat() {
       const bubble = document.getElementById('cat-bubble');
-      const lines = ['喵嗚～加油升級小鎮喔！🐾', '多去酒館解題賺木材吧！🪵', '全鎮 Lv.3 會變成水晶之都喔！✨'];
+      const lines = ['喵嗚～加油升級小鎮喔！🐾', '記得每天去中央許願池簽到喵！⛲', '全鎮 Lv.3 會變成水晶之都喔！✨'];
       bubble.textContent = lines[Math.floor(Math.random() * lines.length)];
       bubble.classList.remove('hidden');
       setTimeout(() => bubble.classList.add('hidden'), 2500);

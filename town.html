@@ -58,14 +58,20 @@
   <img id="img-town" src="image1/home1.webp" alt="小鎮地圖" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="town-layer" class="absolute"></div>
 
- <!-- 頂部狀態列（統一固定在右上角） -->
+<!-- 左上角返回按鈕 -->
+  <div class="absolute top-3 left-3 z-20">
+    <button onclick="window.location.href='town.html'" class="rpg-btn px-4 py-2 rounded-xl text-sm shadow-lg cursor-pointer flex items-center gap-1.5">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
+
+  <!-- 右上角玩家資源狀態列 -->
   <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
-    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-3 md:gap-4 text-xs md:text-sm">
-      <span class="text-amber-400 font-black" id="hud-name">勇者</span>
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-3 md:gap-4 text-xs md:text-sm font-bold text-amber-200">
+      <span class="text-amber-400 font-black">🏛️ 城鎮中心</span>
       <span>🪙 <b id="hud-gold">0</b></span>
       <span>🪵 <b id="hud-wood">0</b></span>
       <span>🪨 <b id="hud-stone">0</b></span>
-      <span class="text-xs bg-amber-800 px-2.5 py-0.5 rounded-full border border-amber-400" id="hud-stage">Lv.1</span>
     </div>
   </div>
 

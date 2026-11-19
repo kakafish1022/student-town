@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>數學奇幻小鎮 - 奇幻寵物牧場</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+  <style>
+    body {
+      background: #120d0a;
+      color: #f3e5ab;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+      user-select: none;
+    }
+
+    .rpg-panel {
+      background: linear-gradient(145deg, #2b1d14, #1c120c);
+      border: 3px solid #c89d54;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.9);
+    }
+
+    .rpg-btn {
+      background: linear-gradient(180deg, #e5b567, #b88232);
+      border: 2px solid #fff2cc;
+      color: #231409;
+      font-weight: 900;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .rpg-btn:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: scale(1.03);
+    }
+
+    .rpg-btn:disabled {
+      background: #3f3226;
+      border-color: #6b5642;
+      color: #8c7662;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* 場景熱區樣式 */
+    .hotspot {
+      position: absolute;
+      cursor: pointer;
+      border-radius: 16px;
+      transition: background 0.2s, box-shadow 0.2s;
+      z-index: 15;
+    }
+
+    .hotspot:hover {
+      background: rgba(255, 223, 100, 0.18);
+      box-shadow: 0 0 22px rgba(255, 215, 0, 0.6);
+    }
+
+    .hotspot-label {
+      position: absolute;
+      top: 6%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.94);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75);
+    }
+
+    .hotspot:hover .hotspot-label {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* 草地放牧寵物動態角色 */
+    .pet-walker {
+      position: absolute;
+      z-index: 25;
+      cursor: pointer;
+      transform: translate(-50%, -85%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .pet-sprite {
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s;
+    }
+
+    /* 進化階段視覺特效（1~3階） */
+    .stage-1 { font-size: 26px; filter: drop-shadow(0 3px 2px rgba(0,0,0,0.85)); }
+    .stage-2 { font-size: 33px; filter: drop-shadow(0 0 6px rgba(110, 231, 183, 0.85)) drop-shadow(0 3px 2px rgba(0,0,0,0.9)); }
+    .stage-3 { font-size: 40px; filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.95)) drop-shadow(0 3px 3px rgba(0,0,0,0.95)); }
+
+    .pet-img-1 { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+    .pet-img-2 { width: 42px; height: 42px; object-fit: contain; image-rendering: pixelated; }
+    .pet-img-3 { width: 52px; height: 52px; object-fit: contain; image-rendering: pixelated; }
+
+    .pet-bubble {
+      background: rgba(255, 251, 235, 0.96);
+      color: #29180a;
+      border: 1.5px solid #b45309;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 2px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+      margin-bottom: 3px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+      pointer-events: none;
+    }
+
+    .pet-tag {
+      background: rgba(20, 12, 8, 0.85);
+      color: #fde68a;
+      border: 1px solid #b45309;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 0 6px;
+      border-radius: 999px;
+      margin-top: 2px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* 底部操作提示條 */
+    .loading-toast {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.94);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 14px;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
+      max-width: 92vw;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex items-center justify-center relative">
+  <!-- 滿版奇幻寵物牧場像素底圖 -->
+  <img id="img-ranch" src="ranch.png" alt="奇幻寵物牧場" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <div id="ranch-layer" class="absolute"></div>
+
+  <!-- 左上角返回按鈕 -->
+  <div class="absolute top-3 left-3 z-20">
+    <button onclick="window.location.href='town.html'" class="rpg-btn px-4 py-2 rounded-xl text-sm shadow-lg cursor-pointer flex items-center gap-1.5">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
+
+  <!-- 右上角玩家資源與牧場等級狀態列 -->
+  <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-3 md:gap-4 text-xs md:text-sm">
+      <span class="text-amber-400 font-black" id="hud-name">勇者</span>
+      <span>🪙 <b id="hud-gold">0</b></span>
+      <span>🪵 <b id="hud-wood">0</b></span>
+      <span>🪨 <b id="hud-stone">0</b></span>
+      <span class="text-xs bg-emerald-900 px-2.5 py-0.5 rounded-full border border-emerald-400 text-emerald-200" id="hud-ranch-lv">牧場 Lv.1</span>
+    </div>
+  </div>
+
+  <!-- 底部操作提示 -->
+  <div id="toast-box" class="loading-toast">
+    🐾 點擊左上【孵化小屋】培育神秘蛋、右上【物資倉庫】餵食進化與管理圖鑑、點擊草地寵物可互動！
+  </div>
+
+  <!-- =========================================================
+       彈窗 1：左上角孵化小屋 -> 神秘蛋孵化器
+       ========================================================= -->
+  <div id="modal-hatchery" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-2xl w-full p-5 md:p-6 rounded-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-4">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">🥚 奇幻神秘蛋孵化屋</h2>
+          <p class="text-xs text-amber-200/80 mt-0.5">購買神秘蛋放入保溫草巢後，前往【冒險者酒館】答對數學題即可累積孵化能量！</p>
+        </div>
+        <button onclick="document.getElementById('modal-hatchery').classList.add('hidden')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 目前正在孵化的蛋狀態框 -->
+      <div id="active-egg-box" class="bg-stone-900/95 border-2 border-amber-500/70 rounded-xl p-4 mb-4">
+        <!-- JS 動態生成 -->
+      </div>
+
+      <!-- 神秘蛋商店列表 -->
+      <div class="text-sm font-black text-amber-300 mb-2">🛒 選擇要領養的神秘蛋（牧場等級越高可解鎖稀有蛋）：</div>
+      <div id="egg-shop-grid" class="grid grid-cols-1 md:grid-cols-3 gap-3 overflow-y-auto pr-1">
+        <!-- JS 動態生成 3 種神秘蛋 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 2：右上角物資倉庫 -> 寵物圖鑑、餵食進化與放牧設定
+       ========================================================= -->
+  <div id="modal-barn" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-4xl w-full p-5 md:p-6 rounded-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-3">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">📖 寵物圖鑑與餵養中心</h2>
+          <p class="text-xs text-amber-200/85 mt-0.5">
+            當前牧場放牧上限：<b id="barn-cap-text" class="text-emerald-300">2 隻</b>（升級牧場建築可解鎖更多放牧格位！）
+          </p>
+        </div>
+        <button onclick="document.getElementById('modal-barn').classList.add('hidden')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 現有資源與出戰夥伴摘要條 -->
+      <div class="bg-black/45 border border-amber-600/50 rounded-xl px-4 py-2 mb-3 flex flex-wrap justify-between items-center gap-2 text-xs md:text-sm">
+        <div>
+          ⚔️ 目前隨身出戰夥伴：<b id="barn-active-pet" class="text-amber-300">尚未設定</b>
+        </div>
+        <div class="flex gap-3 font-black">
+          <span>🪙 <b id="barn-gold" class="text-amber-300">0</b></span>
+          <span>🪵 <b id="barn-wood" class="text-emerald-300">0</b></span>
+          <span>🪨 <b id="barn-stone" class="text-sky-300">0</b></span>
+        </div>
+      </div>
+
+      <!-- 已擁有寵物卡片列表 -->
+      <div id="pet-list-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto pr-1 flex-1">
+        <!-- JS 動態生成已擁有寵物 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const player = getPlayerSession();
+    if (!player) window.location.href = 'index.html';
+
+    // 精準對應 ranch.png 構圖的三大互動熱區
+    const RANCH_HOTSPOTS = [
+      { id: "hatchery", name: "🥚 神秘蛋孵化屋",     left: 10.0, top: 8.0,  width: 28.0, height: 32.0 },
+      { id: "barn",     name: "📖 寵物圖鑑與餵養中心", left: 62.0, top: 5.0,  width: 34.0, height: 37.0 },
+      { id: "exit",     name: "🚪 返回小鎮地圖",     left: 6.0,  top: 58.0, width: 31.0, height: 36.0 }
+    ];
+
+    // =========================================================
+    // 奇幻數學寵物資料庫（9 種精靈，支援 png 優先 / emoji 備援）
+    // =========================================================
+    const PET_CATALOG = {
+      p01: { id: 'p01', name: '森林小幼苗', type: 'wood',  img: 'pet_p01.png', icon: '🌱', skill: '酒館答題木材獎勵 +25%', lines: ['多算一題，我就多長一片葉子！', '括號外面有負號要變號喔！', '木材可以讓我快快長大！'] },
+      p02: { id: 'p02', name: '算盤小赤狐', type: 'gold',  img: 'pet_p02.png', icon: '🦊', skill: '酒館答題金幣獎勵 +20%', lines: ['嘿嘿，這題的心算難不倒我！', '金幣閃閃發亮，再多解幾題吧！', '移項法則記得要變號喔！'] },
+      p03: { id: 'p03', name: '圓周小麻雀', type: 'wood',  img: 'pet_p03.png', icon: '🐤', skill: '酒館答題額外獲得 +5 金幣', lines: ['啾啾！3.1415926～', '今天也要元氣滿滿解數學！', '飛高高看小鎮好漂亮！'] },
+      p04: { id: 'p04', name: '幾何岩甲龜', type: 'stone', img: 'pet_p04.png', icon: '🐢', skill: '酒館答錯時保護連勝不斷線', lines: ['慢慢算、看清楚題目最穩當！', '石頭咬起來脆脆的超好吃～', '三角形內角和是 180 度喔！'] },
+      p05: { id: 'p05', name: '星光史萊姆', type: 'gold',  img: 'pet_p05.png', icon: '💧', skill: '許願池與酒館金幣 +25%', lines: ['咕嚕咕嚕～我會變形喔！', '負負得正、正負得負，記住了嗎？', '水池旁邊涼涼的好舒服～'] },
+      p06: { id: 'p06', name: '水晶獨角獸', type: 'stone', img: 'pet_p06.png', icon: '🦄', skill: '酒館答題石頭獎勵 +30%', lines: ['只有細心的勇者才能駕馭我！', '直角三角形斜邊平方等於兩股平方和！', '全鎮升到 Lv.3 會超壯觀喔！'] },
+      p07: { id: 'p07', name: '畢氏小金龍', type: 'gold',  img: 'pet_p07.png', icon: '🐲', skill: '全資源（金/木/石）獎勵 +25%', lines: ['吼嗚！我是傳說中的數學聖獸！', '任何方程式在我面前都能瞬間破解！', '帶著我出戰，賞金拿到手軟！'] },
+      p08: { id: 'p08', name: '智慧貓頭鷹', type: 'wood',  img: 'pet_p08.png', icon: '🦉', skill: '酒館每場任務獲得 1 次提示護盾', lines: ['咕咕～先乘除後加減，別粗心！', '夜晚的星空藏著幾何的奧秘。', '遇到難題先深呼吸畫個圖吧！'] },
+      p09: { id: 'p09', name: '黃金不死鳥', type: 'stone', img: 'pet_p09.png', icon: '🦅', skill: '連勝 3 題以上金幣獎勵翻倍', lines: ['浴火重生的數學之魂燃燒吧！', '你的計算速度已經超越常人了！', '繼續保持連勝紀錄吧！'] }
+    };
+
+    // 三種神秘蛋設定
+    const EGG_TYPES = [
+      {
+        id: 'egg_wood',
+        name: '🌲 森之木靈蛋',
+        minRanchLv: 1,
+        target: 3, // 需答對 3 題破殼
+        cost: { gold: 40, wood: 30, stone: 10 },
+        pool: ['p01', 'p02', 'p03'],
+        desc: '散發森林氣息的綠紋蛋，只需答對 3 題即可孵化初階夥伴！'
+      },
+      {
+        id: 'egg_stone',
+        name: '🪨 岩晶秘寶蛋',
+        minRanchLv: 2,
+        target: 5, // 需答對 5 題破殼
+        cost: { gold: 90, wood: 40, stone: 50 },
+        pool: ['p04', 'p05', 'p06'],
+        desc: '鑲嵌藍水晶的神秘蛋（需牧場 Lv.2），答對 5 題孵化稀有元素精靈！'
+      },
+      {
+        id: 'egg_star',
+        name: '👑 星辰神獸蛋',
+        minRanchLv: 3,
+        target: 8, // 需答對 8 題破殼
+        cost: { gold: 180, wood: 80, stone: 80 },
+        pool: ['p07', 'p08', 'p09'],
+        desc: '閃耀黃金光輝的傳說蛋（需牧場 Lv.3），答對 8 題召喚傳說級數學聖獸！'
+      }
+    ];
+
+    // 初始化並確保 player.stats.petData 結構完整（新手預設送一隻「森林小幼苗」）
+    if (!player.stats) player.stats = { solved: 0, correct: 0, streak: 0 };
+    if (!player.stats.petData) {
+      player.stats.petData = {
+        active: 'p01',
+        display: ['p01'],
+        egg: null,
+        owned: [
+          { id: 'p01', lv: 1, exp: 0 }
+        ]
+      };
+      savePlayerSession(player);
+    }
+
+    const petData = player.stats.petData;
+    const ranchLv = Math.min(3, Math.max(1, Number((player.buildings && player.buildings.ranch) || 1)));
+    const MAX_DISPLAY_PETS = ranchLv * 2; // Lv.1=2隻, Lv.2=4隻, Lv.3=6隻
+
+    let isSaving = false;
+    let petWalkers = [];
+    let animFrameId = null;
+
+    function showToast(msg) {
+      document.getElementById('toast-box').innerHTML = msg;
+    }
+
+    function refreshHUD() {
+      document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
+      document.getElementById('hud-gold').textContent = player.gold;
+      document.getElementById('hud-wood').textContent = player.wood;
+      document.getElementById('hud-stone').textContent = player.stone;
+      document.getElementById('hud-ranch-lv').textContent = `牧場 Lv.${ranchLv} (放牧 ${petData.display.length}/${MAX_DISPLAY_PETS})`;
+    }
+
+    refreshHUD();
+
+    initHotspotLayer('img-ranch', 'ranch-layer', RANCH_HOTSPOTS, (item) => {
+      if (item.id === 'exit') {
+        window.location.href = 'town.html';
+      } else if (item.id === 'hatchery') {
+        openHatcheryModal();
+      } else if (item.id === 'barn') {
+        openBarnModal();
+      }
+    });
+
+    // =========================================================
+    // 1. 中央大草地放牧系統（自動避開右側藍水池區域）
+    // =========================================================
+    function isInsidePasture(x, y) {
+      // 草地圍欄安全活動範圍（百分比座標）
+      if (x < 22 || x > 76 || y < 38 || y > 72) return false;
+      // 避開右側藍色小水池與木頭飼料槽區域 (x: 50~76, y: 40~60)
+      if (x > 49 && x < 77 && y > 39 && y < 61) return false;
+      return true;
+    }
+
+    function spawnPasturePets() {
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      const layer = document.getElementById('ranch-layer');
+      layer.querySelectorAll('.pet-walker').forEach(el => el.remove());
+
+      const validDisplayIds = (petData.display || []).slice(0, MAX_DISPLAY_PETS);
+      const startSpots = [
+        { x: 32, y: 48 }, { x: 40, y: 62 }, { x: 28, y: 58 },
+        { x: 45, y: 46 }, { x: 56, y: 66 }, { x: 66, y: 65 }
+      ];
+
+      petWalkers = validDisplayIds.map((pid, idx) => {
+        const ownedObj = petData.owned.find(p => p.id === pid);
+        const meta = PET_CATALOG[pid];
+        if (!ownedObj || !meta) return null;
+
+        const lv = Math.min(3, Math.max(1, ownedObj.lv || 1));
+        const pos = startSpots[idx % startSpots.length];
+        const speed = 0.022 + (idx % 3) * 0.004;
+        const angle = (Math.random() * 2 * Math.PI);
+
+        const el = document.createElement('div');
+        el.className = 'pet-walker';
+        el.style.left = pos.x + '%';
+        el.style.top = pos.y + '%';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'pet-bubble hidden';
+        bubble.textContent = meta.lines[0];
+
+        const sprite = document.createElement('div');
+        sprite.className = `pet-sprite stage-${lv}`;
+
+        const imgEl = document.createElement('img');
+        imgEl.src = meta.img;
+        imgEl.className = `pet-img-${lv}`;
+        imgEl.onerror = () => {
+          sprite.innerHTML = meta.icon;
+        };
+        sprite.appendChild(imgEl);
+
+        const tag = document.createElement('div');
+        tag.className = 'pet-tag';
+        tag.textContent = `${petData.active === pid ? '⚔️' : ''}${meta.name} Lv.${lv}`;
+
+        el.appendChild(bubble);
+        el.appendChild(sprite);
+        el.appendChild(tag);
+        layer.appendChild(el);
+
+        // 點擊寵物撫摸互動
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          bubble.textContent = meta.lines[Math.floor(Math.random() * meta.lines.length)];
+          bubble.classList.remove('hidden');
+          clearTimeout(el._bubbleTimer);
+          el._bubbleTimer = setTimeout(() => bubble.classList.add('hidden'), 3000);
+        });
+
+        return {
+          el, sprite, bubble, meta,
+          x: pos.x, y: pos.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          speed,
+          nextTalkTime: Date.now() + 3000 + idx * 1500
+        };
+      }).filter(Boolean);
+
+      function tick() {
+        const now = Date.now();
+        petWalkers.forEach(p => {
+          const nx = p.x + p.vx;
+          const ny = p.y + p.vy;
+
+          if (isInsidePasture(nx, ny)) {
+            p.x = nx;
+            p.y = ny;
+          } else {
+            // 碰到柵欄或水池邊緣時隨機挑選一個安全方向轉向
+            for (let attempt = 0; attempt < 12; attempt++) {
+              const newAngle = Math.random() * Math.PI * 2;
+              const tvx = Math.cos(newAngle) * p.speed;
+              const tvy = Math.sin(newAngle) * p.speed;
+              if (isInsidePasture(p.x + tvx * 8, p.y + tvy * 8)) {
+                p.vx = tvx;
+                p.vy = tvy;
+                break;
+              }
+            }
+          }
+
+          p.sprite.style.transform = p.vx < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+          p.el.style.left = p.x + '%';
+          p.el.style.top = p.y + '%';
+
+          if (now > p.nextTalkTime) {
+            p.nextTalkTime = now + 5500 + Math.random() * 4000;
+            if (p.bubble.classList.contains('hidden') && Math.random() < 0.5) {
+              p.bubble.textContent = p.meta.lines[Math.floor(Math.random() * p.meta.lines.length)];
+              p.bubble.classList.remove('hidden');
+              setTimeout(() => p.bubble.classList.add('hidden'), 2800);
+            }
+          }
+        });
+        animFrameId = requestAnimationFrame(tick);
+      }
+
+      animFrameId = requestAnimationFrame(tick);
+    }
+
+    setTimeout(spawnPasturePets, 150);
+
+    // =========================================================
+    // 2. 神秘蛋孵化系統
+    // =========================================================
+    function openHatcheryModal() {
+      renderHatchery();
+      document.getElementById('modal-hatchery').classList.remove('hidden');
+    }
+
+    function renderHatchery() {
+      const eggBox = document.getElementById('active-egg-box');
+      const curEgg = petData.egg;
+
+      if (!curEgg) {
+        eggBox.innerHTML = `
+          <div class="text-center py-2">
+            <div class="text-3xl mb-1">🪹</div>
+            <div class="text-sm font-bold text-amber-200">目前保溫草巢是空的！</div>
+            <div class="text-xs text-amber-200/70 mt-1">請從下方選擇一顆神秘蛋開始孵化吧！</div>
+          </div>
+        `;
+      } else {
+        const eggMeta = EGG_TYPES.find(e => e.id === curEgg.id) || EGG_TYPES[0];
+        const pct = Math.min(100, Math.round((curEgg.cur / curEgg.max) * 100));
+        const readyToHatch = curEgg.cur >= curEgg.max;
+
+        eggBox.innerHTML = `
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <div class="text-4xl animate-bounce">🥚</div>
+              <div>
+                <div class="font-black text-base text-amber-300">${eggMeta.name}</div>
+                <div class="text-xs text-amber-100/80">孵化進度：答對 <b>${curEgg.cur} / ${curEgg.max}</b> 題 (${pct}%)</div>
+                <div class="w-48 h-2.5 bg-stone-800 rounded-full overflow-hidden border border-amber-600/60 mt-1.5">
+                  <div class="h-full bg-gradient-to-r from-amber-500 to-emerald-400" style="width: ${pct}%"></div>
+                </div>
+              </div>
+            </div>
+            <div>
+              ${readyToHatch
+                ? `<button onclick="hatchEggNow()" ${isSaving ? 'disabled' : ''} class="rpg-btn px-5 py-2.5 rounded-xl text-sm cursor-pointer animate-pulse">✨ 立即破殼孵化！</button>`
+                : `<button onclick="window.location.href='town.html'" class="bg-amber-900/90 hover:bg-amber-800 border border-amber-400 text-amber-100 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">⚔️ 前往酒館答題累積能量</button>`
+              }
+            </div>
+          </div>
+        `;
+      }
+
+      const shopGrid = document.getElementById('egg-shop-grid');
+      shopGrid.innerHTML = EGG_TYPES.map(egg => {
+        const locked = ranchLv < egg.minRanchLv;
+        const canAfford = player.gold >= egg.cost.gold && player.wood >= egg.cost.wood && player.stone >= egg.cost.stone;
+        const hasEggAlready = Boolean(petData.egg);
+        const disabled = locked || !canAfford || hasEggAlready || isSaving;
+
+        let btnLabel = '🥚 領養此蛋';
+        if (locked) btnLabel = `🔒 需牧場 Lv.${egg.minRanchLv}`;
+        else if (hasEggAlready) btnLabel = '草巢孵化中';
+        else if (!canAfford) btnLabel = '資源不足';
+
+        return `
+          <div class="bg-stone-900/90 border-2 ${locked ? 'border-stone-700 opacity-75' : 'border-amber-700/80'} rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="font-black text-base text-amber-200 mb-1">${egg.name}</div>
+              <p class="text-xs text-amber-100/75 leading-relaxed mb-2">${egg.desc}</p>
+            </div>
+            <div>
+              <div class="flex justify-between text-xs font-black bg-black/50 px-2.5 py-1.5 rounded-lg mb-2">
+                <span>🪙 ${egg.cost.gold}</span>
+                <span>🪵 ${egg.cost.wood}</span>
+                <span>🪨 ${egg.cost.stone}</span>
+              </div>
+              <button onclick="buyEgg('${egg.id}')" ${disabled ? 'disabled' : ''} class="rpg-btn w-full py-1.5 rounded-lg text-xs cursor-pointer">
+                ${btnLabel}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function buyEgg(eggId) {
+      if (isSaving || petData.egg) return;
+      const egg = EGG_TYPES.find(e => e.id === eggId);
+      if (!egg || ranchLv < egg.minRanchLv) return;
+      if (player.gold < egg.cost.gold || player.wood < egg.cost.wood || player.stone < egg.cost.stone) {
+        return showToast('⚠️ 資源不足，無法領養神秘蛋！');
+      }
+
+      player.gold -= egg.cost.gold;
+      player.wood -= egg.cost.wood;
+      player.stone -= egg.cost.stone;
+      petData.egg = { id: egg.id, cur: 0, max: egg.target };
+
+      savePlayerSession(player);
+      refreshHUD();
+      renderHatchery();
+      showToast(`🥚 已將【${egg.name}】放入保溫草巢！快去酒館答題累積孵化能量吧！`);
+      await syncPetProgress();
+    }
+
+    async function hatchEggNow() {
+      if (isSaving || !petData.egg || petData.egg.cur < petData.egg.max) return;
+      const eggMeta = EGG_TYPES.find(e => e.id === petData.egg.id) || EGG_TYPES[0];
+      const randomPetId = eggMeta.pool[Math.floor(Math.random() * eggMeta.pool.length)];
+      const newPetMeta = PET_CATALOG[randomPetId];
+
+      const existing = petData.owned.find(p => p.id === randomPetId);
+      let msg = '';
+      if (existing) {
+        existing.exp += 30;
+        if (existing.lv < 3 && existing.exp >= existing.lv * 50) {
+          existing.exp -= existing.lv * 50;
+          existing.lv += 1;
+          msg = `🎉 蛋殼裂開了！孵出重複的【${newPetMeta.name}】，轉化能量並成功進化為 Lv.${existing.lv}！`;
+        } else {
+          msg = `✨ 蛋殼裂開了！孵出【${newPetMeta.name}】，自動轉化為 +30 親密經驗！`;
+        }
+      } else {
+        petData.owned.push({ id: randomPetId, lv: 1, exp: 0 });
+        if (petData.display.length < MAX_DISPLAY_PETS) {
+          petData.display.push(randomPetId);
+        }
+        msg = `🎉 奇蹟誕生！恭喜獲得新夥伴【${newPetMeta.icon} ${newPetMeta.name}】！`;
+      }
+
+      petData.egg = null;
+      savePlayerSession(player);
+      refreshHUD();
+      spawnPasturePets();
+      renderHatchery();
+      showToast(msg);
+      await syncPetProgress();
+    }
+
+    // =========================================================
+    // 3. 寵物圖鑑、餵食進化與放牧管理
+    // =========================================================
+    function openBarnModal() {
+      renderBarn();
+      document.getElementById('modal-barn').classList.remove('hidden');
+    }
+
+    function renderBarn() {
+      document.getElementById('barn-cap-text').textContent = `${petData.display.length} / ${MAX_DISPLAY_PETS} 隻`;
+      document.getElementById('barn-gold').textContent = player.gold;
+      document.getElementById('barn-wood').textContent = player.wood;
+      document.getElementById('barn-stone').textContent = player.stone;
+
+      const activeMeta = PET_CATALOG[petData.active];
+      document.getElementById('barn-active-pet').textContent = activeMeta
+        ? `${activeMeta.icon} ${activeMeta.name}（${activeMeta.skill}）`
+        : '尚未設定';
+
+      const grid = document.getElementById('pet-list-grid');
+      grid.innerHTML = petData.owned.map(p => {
+        const meta = PET_CATALOG[p.id];
+        if (!meta) return '';
+        const isMax = p.lv >= 3;
+        const needExp = p.lv * 50;
+        const isActive = petData.active === p.id;
+        const isDisplayed = petData.display.includes(p.id);
+
+        const feedLabel = meta.type === 'wood' ? '🪵 餵食木材 (15)' : meta.type === 'stone' ? '🪨 餵食石頭 (15)' : '🪙 餵食金幣 (25)';
+        const canFeed = !isMax && !isSaving && (
+          (meta.type === 'wood' && player.wood >= 15) ||
+          (meta.type === 'stone' && player.stone >= 15) ||
+          (meta.type === 'gold' && player.gold >= 25)
+        );
+
+        return `
+          <div class="bg-stone-900/95 border-2 ${isActive ? 'border-amber-400' : 'border-amber-800/80'} rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-start mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-3xl">${meta.icon}</span>
+                  <div>
+                    <div class="font-black text-sm text-amber-200">${meta.name}</div>
+                    <span class="text-[11px] px-2 py-0.5 rounded bg-amber-950 border border-amber-600 text-amber-300 font-bold">
+                      ${p.lv === 1 ? 'Lv.1 幼年期' : p.lv === 2 ? 'Lv.2 成長期' : '👑 Lv.3 究極體'}
+                    </span>
+                  </div>
+                </div>
+                ${isActive ? '<span class="text-[11px] bg-amber-400 text-stone-950 font-black px-2 py-0.5 rounded-full">⚔️ 出戰中</span>' : ''}
+              </div>
+
+              <div class="text-xs text-emerald-300 bg-black/40 px-2.5 py-1.5 rounded-lg mb-2">
+                ✨ 技能：${meta.skill}
+              </div>
+
+              ${isMax
+                ? `<div class="text-xs text-center text-amber-300 font-bold py-1">已達最高進化型態！</div>`
+                : `<div class="mb-2">
+                    <div class="flex justify-between text-[11px] text-amber-200/80 mb-0.5">
+                      <span>親密成長值</span>
+                      <span>${p.exp} / ${needExp}</span>
+                    </div>
+                    <div class="w-full h-2 bg-stone-800 rounded-full overflow-hidden">
+                      <div class="h-full bg-amber-400" style="width: ${Math.min(100, Math.round((p.exp / needExp) * 100))}%"></div>
+                    </div>
+                  </div>`
+              }
+            </div>
+
+            <div class="space-y-1.5 mt-2 pt-2 border-t border-amber-900/60">
+              ${!isMax ? `
+                <button onclick="feedPet('${p.id}')" ${!canFeed ? 'disabled' : ''} class="rpg-btn w-full py-1.5 rounded-lg text-xs cursor-pointer">
+                  ${feedLabel} (+25經驗)
+                </button>` : ''
+              }
+              <div class="grid grid-cols-2 gap-1.5">
+                <button onclick="setActivePet('${p.id}')" ${isActive || isSaving ? 'disabled' : ''} class="bg-amber-900/90 hover:bg-amber-800 disabled:opacity-50 border border-amber-500/70 text-amber-100 py-1 rounded-lg text-[11px] font-bold cursor-pointer">
+                  ${isActive ? '✔ 已設為出戰' : '⚔️ 設為出戰'}
+                </button>
+                <button onclick="toggleDisplayPet('${p.id}')" ${isSaving ? 'disabled' : ''} class="bg-emerald-950 hover:bg-emerald-900 border border-emerald-500/70 text-emerald-200 py-1 rounded-lg text-[11px] font-bold cursor-pointer">
+                  ${isDisplayed ? '🏡 收回小屋' : '🌿 放出草地'}
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function feedPet(pid) {
+      if (isSaving) return;
+      const p = petData.owned.find(item => item.id === pid);
+      const meta = PET_CATALOG[pid];
+      if (!p || !meta || p.lv >= 3) return;
+
+      if (meta.type === 'wood') {
+        if (player.wood < 15) return;
+        player.wood -= 15;
+      } else if (meta.type === 'stone') {
+        if (player.stone < 15) return;
+        player.stone -= 15;
+      } else {
+        if (player.gold < 25) return;
+        player.gold -= 25;
+      }
+
+      p.exp += 25;
+      const needExp = p.lv * 50;
+      let evolved = false;
+      if (p.exp >= needExp) {
+        p.exp -= needExp;
+        p.lv += 1;
+        evolved = true;
+      }
+
+      savePlayerSession(player);
+      refreshHUD();
+      renderBarn();
+      spawnPasturePets();
+
+      if (evolved) {
+        showToast(`🎊 太棒了！【${meta.name}】進化成 ${p.lv === 2 ? '成長期 (Lv.2)' : '究極體 (Lv.3)'} 啦！`);
+      } else {
+        showToast(`🍖 餵食成功！【${meta.name}】開心地跳了起來（親密度 +25）`);
+      }
+      await syncPetProgress();
+    }
+
+    async function setActivePet(pid) {
+      if (isSaving || petData.active === pid) return;
+      petData.active = pid;
+      savePlayerSession(player);
+      renderBarn();
+      spawnPasturePets();
+      const meta = PET_CATALOG[pid];
+      showToast(`⚔️ 已將【${meta.name}】設為隨身出戰夥伴（${meta.skill}）！`);
+      await syncPetProgress();
+    }
+
+    async function toggleDisplayPet(pid) {
+      if (isSaving) return;
+      const idx = petData.display.indexOf(pid);
+      if (idx !== -1) {
+        petData.display.splice(idx, 1);
+      } else {
+        if (petData.display.length >= MAX_DISPLAY_PETS) {
+          return showToast(`⚠️ 目前牧場 Lv.${ranchLv} 最多只能同時放牧 ${MAX_DISPLAY_PETS} 隻寵物喔！`);
+        }
+        petData.display.push(pid);
+      }
+      savePlayerSession(player);
+      refreshHUD();
+      renderBarn();
+      spawnPasturePets();
+      await syncPetProgress();
+    }
+
+    async function syncPetProgress() {
+      if (isSaving || !GAS_API_URL) return;
+      isSaving = true;
+      try {
+        await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'saveProgress', player })
+        });
+      } catch (err) {
+        console.error('牧場雲端存檔失敗：', err);
+      } finally {
+        isSaving = false;
+      }
+    }
+  </script>
+</body>
+</html>

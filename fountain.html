@@ -3,214 +3,101 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>奇幻許願池與智慧女神殿</title>
+  <title>數學奇幻小鎮 - 奇幻許願池與智慧女神殿</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="config.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
-    }
-
     body {
-      background: radial-gradient(circle at top, #1e2a4a 0%, #0d1326 100%);
-      color: #f8f1e5;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px 16px 40px;
-      overflow-x: hidden;
+      background: #120d0a;
+      color: #f3e5ab;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+      user-select: none;
     }
 
-    /* 頂部導覽列 */
-    .top-bar {
-      width: 100%;
-      max-width: 720px;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 2px solid #d4af37;
-      border-radius: 12px;
-      padding: 10px 16px;
-      margin-bottom: 24px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    .rpg-panel {
+      background: linear-gradient(145deg, #2b1d14, #1c120c);
+      border: 3px solid #c89d54;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.85);
     }
 
-    .back-btn {
-      background: linear-gradient(135deg, #d4af37, #b8860b);
-      color: #1a120b;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-weight: bold;
+    .rpg-btn {
+      background: linear-gradient(180deg, #e5b567, #b88232);
+      border: 2px solid #fff2cc;
+      color: #231409;
+      font-weight: 900;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .rpg-btn:hover {
+      filter: brightness(1.08);
+      transform: scale(1.03);
+    }
+
+    /* 場景熱區樣式（與 town.html 完全一致） */
+    .hotspot {
+      position: absolute;
       cursor: pointer;
+      border-radius: 14px;
+      transition: background 0.2s, box-shadow 0.2s;
+      z-index: 10;
+    }
+
+    .hotspot:hover {
+      background: rgba(255, 223, 100, 0.16);
+      box-shadow: 0 0 22px rgba(255, 215, 0, 0.55);
+    }
+
+    .hotspot-label {
+      position: absolute;
+      top: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.92);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+    }
+
+    .hotspot:hover .hotspot-label {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* 載入中提示光環 */
+    .loading-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.94);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 10px 24px;
+      border-radius: 999px;
+      font-weight: 800;
       font-size: 15px;
-      transition: transform 0.15s;
-    }
-
-    .back-btn:hover {
-      transform: scale(1.05);
-    }
-
-    .player-status {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      font-size: 14px;
-      font-weight: bold;
-      color: #ffd700;
-    }
-
-    /* 標題區 */
-    .header-title {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-
-    .header-title h1 {
-      font-size: 28px;
-      color: #ffd700;
-      text-shadow: 0 2px 10px rgba(255, 215, 0, 0.4);
-      margin-bottom: 6px;
-    }
-
-    .header-title p {
-      font-size: 14px;
-      color: #cbd5e1;
-    }
-
-    /* 雙聖地互動卡片區 */
-    .shrine-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
-      width: 100%;
-      max-width: 720px;
-    }
-
-    .shrine-card {
-      background: rgba(30, 41, 59, 0.85);
-      border: 2px solid #94a3b8;
-      border-radius: 16px;
-      padding: 24px 20px;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-between;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-      transition: transform 0.2s, border-color 0.2s;
-    }
-
-    .shrine-card:hover {
-      transform: translateY(-4px);
-      border-color: #ffd700;
-    }
-
-    .shrine-icon {
-      font-size: 64px;
-      margin-bottom: 12px;
-      filter: drop-shadow(0 4px 12px rgba(255, 215, 0, 0.35));
-    }
-
-    .shrine-card h2 {
-      font-size: 22px;
-      color: #fde047;
-      margin-bottom: 8px;
-    }
-
-    .shrine-desc {
-      font-size: 14px;
-      color: #cbd5e1;
-      line-height: 1.6;
-      margin-bottom: 20px;
-    }
-
-    .action-btn {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-sign {
-      background: linear-gradient(135deg, #38bdf8, #0284c7);
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
-    }
-
-    .btn-sign:hover:not(:disabled) {
-      filter: brightness(1.1);
-    }
-
-    .btn-fortune {
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      color: #fff;
-      box-shadow: 0 4px 12px rgba(217, 119, 6, 0.4);
-    }
-
-    .btn-fortune:hover:not(:disabled) {
-      filter: brightness(1.1);
-    }
-
-    .action-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    /* 訊息提示條 */
-    .toast-msg {
-      margin-top: 20px;
-      padding: 12px 20px;
-      border-radius: 10px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid #ffd700;
-      color: #fde047;
-      font-size: 15px;
-      font-weight: bold;
-      text-align: center;
-      display: none;
-      max-width: 720px;
-      width: 100%;
-      line-height: 1.6;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
     }
 
     /* =========================================
-       神諭詩籤 3D 翻轉大彈窗
+       智慧女神神諭・3D 翻轉詩籤卡片
        ========================================= */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.78);
-      backdrop-filter: blur(4px);
-      display: none;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-      padding: 20px;
-    }
-
-    .modal-overlay.active {
-      display: flex;
-    }
-
-    /* 3D 翻轉容器 */
     .fortune-card-scene {
-      width: 300px;
-      height: 400px;
-      perspective: 1100px;
+      width: 310px;
+      height: 430px;
+      perspective: 1200px;
       cursor: pointer;
-      user-select: none;
     }
 
     .fortune-card {
@@ -230,66 +117,59 @@
       inset: 0;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
-      border-radius: 16px;
+      border-radius: 18px;
       border: 4px solid #d4af37;
-      box-shadow: 0 14px 35px rgba(0, 0, 0, 0.75);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.85), inset 0 0 18px rgba(212, 175, 55, 0.35);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      padding: 24px 20px;
+      padding: 26px 20px;
     }
 
-    /* 正面：復古羊皮紙 */
+    /* 正面：復古羊皮紙神諭 */
     .card-front {
-      background: linear-gradient(155deg, #fdf6e3 0%, #f1dec0 100%);
-      color: #3b2818;
-    }
-
-    .card-header-tag {
-      font-size: 13px;
-      letter-spacing: 3px;
-      color: #7c5836;
-      font-weight: bold;
+      background: radial-gradient(circle at center, #fffaf0 0%, #f0dbb8 100%);
+      color: #3b2312;
     }
 
     .luck-badge {
       font-size: 32px;
       font-weight: 900;
       letter-spacing: 6px;
-      padding: 6px 24px;
+      padding: 6px 26px;
       border-radius: 10px;
       background: #8b0000;
       color: #ffd700;
       border: 2px solid #ffd700;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       margin-top: 6px;
     }
 
-    /* 四行詩排版 */
+    /* 嚴格四行絕句排版 */
     .poem-lines {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 15px;
       font-size: 21px;
       font-weight: 900;
       letter-spacing: 2px;
       text-align: center;
       margin: auto 0;
-      color: #2c1a0e;
+      color: #2c1608;
     }
 
-    /* 背面：神秘星空紫 */
+    /* 背面：神秘星空解籤 */
     .card-back {
       transform: rotateY(180deg);
-      background: linear-gradient(155deg, #2b193d 0%, #160c24 100%);
+      background: linear-gradient(155deg, #2a183b 0%, #140b21 100%);
       color: #f8e8c8;
       border-color: #ffd700;
     }
 
     .explain-title {
-      font-size: 22px;
-      font-weight: bold;
+      font-size: 21px;
+      font-weight: 900;
       color: #ffd700;
       border-bottom: 2px solid rgba(255, 215, 0, 0.35);
       padding-bottom: 10px;
@@ -303,184 +183,152 @@
       line-height: 2.1;
       text-align: center;
       margin: auto 0;
-      padding: 0 6px;
+      padding: 0 8px;
       font-weight: bold;
       color: #fef3c7;
     }
 
     .flip-hint {
       font-size: 13px;
-      font-weight: bold;
-      opacity: 0.85;
+      font-weight: 800;
       animation: pulseHint 1.6s infinite;
     }
 
     @keyframes pulseHint {
-      0%, 100% { opacity: 0.5; transform: scale(0.98); }
-      50% { opacity: 1; transform: scale(1.02); }
-    }
-
-    .close-modal-btn {
-      margin-top: 22px;
-      background: rgba(255, 255, 255, 0.15);
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      padding: 10px 28px;
-      border-radius: 999px;
-      font-size: 15px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .close-modal-btn:hover {
-      background: rgba(255, 255, 255, 0.3);
+      0%, 100% { opacity: 0.55; transform: scale(0.98); }
+      50% { opacity: 1; transform: scale(1.03); }
     }
   </style>
 </head>
-<body>
+<body class="w-screen h-screen flex items-center justify-center relative">
+  <!-- 滿版許願池與智慧女神底圖 -->
+  <img id="img-fountain" src="fountain.png" alt="許願池與智慧女神" class="w-full h-full object-contain" />
+  <div id="fountain-layer" class="absolute"></div>
 
-  <!-- 頂部狀態列 -->
-  <div class="top-bar">
-    <button class="back-btn" onclick="goBackTown()">⬅ 返回小鎮</button>
-    <div class="player-status">
-      <span id="uiNickname">勇者</span>
-      <span>🪙 <span id="uiGold">0</span></span>
-      <span>🪵 <span id="uiWood">0</span></span>
-      <span>🪨 <span id="uiStone">0</span></span>
+  <!-- 右上角玩家資源狀態列（避開左上角底圖的「返回小鎮」木牌） -->
+  <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-4 text-sm">
+      <span class="text-amber-400 font-black" id="hud-name">勇者</span>
+      <span>🪙 <b id="hud-gold">0</b></span>
+      <span>🪵 <b id="hud-wood">0</b></span>
+      <span>🪨 <b id="hud-stone">0</b></span>
     </div>
   </div>
 
-  <!-- 頁面標題 -->
-  <div class="header-title">
-    <h1>⛲ 奇幻許願池與智慧女神殿</h1>
-    <p>每日投幣祈福領取資源，向智慧女神求取今日專屬神諭！</p>
+  <!-- 底部操作提示 -->
+  <div id="toast-box" class="loading-toast">
+    ✨ 點擊左側【智慧女神像】求今日神諭，點擊右側【星光許願池】進行每日簽到！
   </div>
 
-  <!-- 雙互動卡片 -->
-  <div class="shrine-grid">
-    <!-- 許願池簽到 -->
-    <div class="shrine-card">
-      <div class="shrine-icon">⛲</div>
-      <h2>星光許願池</h2>
-      <p class="shrine-desc">
-        每天來許願池報到一次，即可獲得金幣、木材與石頭祝福，累積第 4 天與第 7 天還有超級寶箱大獎！
-      </p>
-      <button class="action-btn btn-sign" id="btnSign" onclick="handleDailySign()">
-        ✨ 每日許願簽到
-      </button>
-    </div>
-
-    <!-- 智慧女神求籤 -->
-    <div class="shrine-card">
-      <div class="shrine-icon">🗽</div>
-      <h2>智慧女神像</h2>
-      <p class="shrine-desc">
-        誠心向智慧女神祈求今日運勢詩籤（每日限求一支），點擊詩籤可翻轉查看女神解籤聖意！
-      </p>
-      <button class="action-btn btn-fortune" id="btnFortune" onclick="handleDrawFortune()">
-        🔮 向女神求今日籤
+  <!-- 許願池每日簽到結果彈窗 -->
+  <div id="modal-sign" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-sm w-full p-6 rounded-2xl text-center">
+      <div class="text-5xl mb-2" id="sign-icon">⛲</div>
+      <h3 class="text-2xl font-black text-amber-300 mb-2" id="sign-title">每日水靈祝福</h3>
+      <p class="text-sm text-amber-100/90 mb-4 leading-relaxed" id="sign-desc">獲得資源獎勵！</p>
+      <div id="sign-rewards" class="bg-black/40 border border-amber-500/40 rounded-xl p-3 mb-5 text-base font-black text-amber-200 flex justify-center gap-4">
+      </div>
+      <button onclick="document.getElementById('modal-sign').classList.add('hidden')" class="rpg-btn px-7 py-2.5 rounded-xl text-base cursor-pointer">
+        收下祝福
       </button>
     </div>
   </div>
 
-  <!-- 系統提示訊息 -->
-  <div class="toast-msg" id="toastMsg"></div>
+  <!-- 智慧女神・3D 翻轉神諭詩籤彈窗 -->
+  <div id="modal-fortune" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex flex-col items-center justify-center p-4">
+    <div id="fortune-status-tag" class="mb-3 px-4 py-1 rounded-full bg-amber-950/90 border border-amber-400 text-amber-200 text-xs font-bold">
+      ✦ 點擊詩籤卡片可翻轉查看女神解籤 ✦
+    </div>
 
-  <!-- 3D 翻轉詩籤彈窗 -->
-  <div class="modal-overlay" id="fortuneModal">
     <div class="fortune-card-scene" onclick="toggleFortuneCard()">
-      <div class="fortune-card" id="fortuneCard">
-        <!-- 正面：籤運 + 四行詩 -->
+      <div class="fortune-card" id="fortune-card">
+        <!-- 正面：籤運 ＋ 四行詩 -->
         <div class="card-face card-front">
-          <div style="text-align: center;">
-            <div class="card-header-tag">✦ 智慧女神神諭 ✦</div>
-            <div class="luck-badge" id="cardLuck">大吉</div>
+          <div class="text-center">
+            <div class="text-xs tracking-widest text-amber-900/80 font-extrabold">✦ 智慧女神神諭 ✦</div>
+            <div class="luck-badge" id="card-luck">大吉</div>
           </div>
-          <div class="poem-lines" id="cardPoemLines">
-            <!-- JS 動態填入 4 行詩句 -->
+
+          <div class="poem-lines" id="card-poem">
+            <!-- JS 自動拆成 4 行填入 -->
           </div>
-          <div class="flip-hint">👆 點擊詩籤翻轉看解籤</div>
+
+          <div class="flip-hint text-amber-900">👆 點擊詩籤翻轉看解籤</div>
         </div>
 
         <!-- 背面：女神聖意（解籤） -->
         <div class="card-face card-back">
           <div class="explain-title">📜 女神聖意・解籤</div>
-          <div class="explain-content" id="cardExplain">
-            <!-- JS 動態填入解籤內容 -->
+          <div class="explain-content" id="card-explain">
+            <!-- JS 填入解籤內容 -->
           </div>
-          <div class="flip-hint">👆 點擊翻回詩籤正面</div>
+          <div class="flip-hint text-amber-300">👆 點擊翻回詩籤正面</div>
         </div>
       </div>
     </div>
 
-    <button class="close-modal-btn" onclick="closeFortuneModal()">收起神諭詩籤</button>
+    <button onclick="document.getElementById('modal-fortune').classList.add('hidden')" class="rpg-btn mt-5 px-8 py-2.5 rounded-xl text-base cursor-pointer">
+      收起神諭詩籤
+    </button>
   </div>
 
   <script>
-    // 直接使用 config.js 的 getPlayerSession() 與 GAS_API_URL
-    const player = typeof getPlayerSession === "function" ? getPlayerSession() : null;
-    if (!player) {
-      window.location.href = "index.html";
+    const player = getPlayerSession();
+    if (!player) window.location.href = 'index.html';
+
+    // 精準對應 fountain.png 構圖的三大互動熱區
+    const FOUNTAIN_HOTSPOTS = [
+      { id: "back",    name: "↩ 返回小鎮",       left: 3.3,  top: 4.5,  width: 16.5, height: 9.0  },
+      { id: "goddess", name: "🗽 智慧女神像・求籤", left: 13.0, top: 11.5, width: 21.0, height: 63.0 },
+      { id: "pool",    name: "⛲ 星光許願池・簽到", left: 44.5, top: 20.0, width: 47.0, height: 59.0 }
+    ];
+
+    function refreshHUD() {
+      document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
+      document.getElementById('hud-gold').textContent = player.gold;
+      document.getElementById('hud-wood').textContent = player.wood;
+      document.getElementById('hud-stone').textContent = player.stone;
     }
 
-    const API_ENDPOINT = (typeof GAS_API_URL !== "undefined" && GAS_API_URL)
-      ? GAS_API_URL
-      : "https://script.google.com/macros/s/AKfycbzzAYrRCU8RNzqKA5i5Z9i5KEngeswK4sAN3HKKALkTF4A-IVl-bRQVrfhkSGfKDEDgdA/exec";
-
-    function syncPlayerSession(p) {
-      if (typeof savePlayerSession === "function") {
-        savePlayerSession(p);
+    function saveLocalPlayer() {
+      if (typeof savePlayerSession === 'function') {
+        savePlayerSession(player);
       } else {
-        // 備援：同步更新 sessionStorage / localStorage 內的 player 資料
-        [sessionStorage, localStorage].forEach(store => {
-          for (let i = 0; i < store.length; i++) {
-            const k = store.key(i);
-            try {
-              const obj = JSON.parse(store.getItem(k));
-              if (obj && obj.studentId === p.studentId) {
-                store.setItem(k, JSON.stringify(p));
-              }
-            } catch (e) {}
-          }
-        });
+        sessionStorage.setItem('math_town_player', JSON.stringify(player));
       }
     }
 
-    function updateTopUI() {
-      if (!player) return;
-      document.getElementById("uiNickname").textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
-      document.getElementById("uiGold").textContent = player.gold ?? 0;
-      document.getElementById("uiWood").textContent = player.wood ?? 0;
-      document.getElementById("uiStone").textContent = player.stone ?? 0;
+    function showToast(msg) {
+      document.getElementById('toast-box').innerHTML = msg;
     }
 
-    window.addEventListener("DOMContentLoaded", updateTopUI);
+    refreshHUD();
 
-    function showToast(text) {
-      const el = document.getElementById("toastMsg");
-      el.innerHTML = text;
-      el.style.display = "block";
-    }
+    let isBusy = false;
 
-    function goBackTown() {
-      window.location.href = "town.html";
-    }
+    initHotspotLayer('img-fountain', 'fountain-layer', FOUNTAIN_HOTSPOTS, (item) => {
+      if (item.id === 'back') {
+        window.location.href = 'town.html';
+      } else if (item.id === 'pool') {
+        triggerDailySign();
+      } else if (item.id === 'goddess') {
+        triggerDrawFortune();
+      }
+    });
 
     // =========================================
-    // 動作 1：每日許願池簽到
+    // 1. 點擊右側水池：每日許願簽到
     // =========================================
-    async function handleDailySign() {
-      if (!player) return;
-      const btn = document.getElementById("btnSign");
-      btn.disabled = true;
-      btn.textContent = "⏳ 許願祈福中...";
+    async function triggerDailySign() {
+      if (isBusy) return;
+      isBusy = true;
+      showToast('⛲ 正在向星光許願池投幣祈福中...');
 
       try {
-        const res = await fetch(API_ENDPOINT, {
-          method: "POST",
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
           body: JSON.stringify({
-            action: "dailySign",
+            action: 'dailySign',
             studentId: player.studentId
           })
         });
@@ -490,39 +338,49 @@
           player.gold = data.totals.gold;
           player.wood = data.totals.wood;
           player.stone = data.totals.stone;
-          syncPlayerSession(player);
-          updateTopUI();
-          showToast(
-            `✨ ${data.rewardTitle}（累積第 ${data.streak} 天）<br>` +
-            `獲得：🪙+${data.reward.gold}、🪵+${data.reward.wood}、🪨+${data.reward.stone}`
-          );
+          saveLocalPlayer();
+          refreshHUD();
+
+          document.getElementById('sign-icon').textContent = '✨';
+          document.getElementById('sign-title').textContent = data.rewardTitle || '每日水靈祝福';
+          document.getElementById('sign-desc').textContent = `許願池綻放出耀眼光芒！目前已連續祈福第 ${data.streak} 天！`;
+          document.getElementById('sign-rewards').innerHTML = `
+            <span>🪙 +${data.reward.gold}</span>
+            <span>🪵 +${data.reward.wood}</span>
+            <span>🪨 +${data.reward.stone}</span>
+          `;
+          document.getElementById('modal-sign').classList.remove('hidden');
+          showToast(`✨ 簽到成功！連續第 ${data.streak} 天祈福完成！`);
         } else if (data.alreadySigned) {
-          showToast(`💧 ${data.message}（目前累積第 ${data.streak} 天）`);
+          document.getElementById('sign-icon').textContent = '💧';
+          document.getElementById('sign-title').textContent = '今日已祈福過囉';
+          document.getElementById('sign-desc').textContent = `${data.message}（目前累積連續第 ${data.streak} 天，明天再來吧！）`;
+          document.getElementById('sign-rewards').innerHTML = `<span>明日繼續累積可解鎖寶箱大獎！</span>`;
+          document.getElementById('modal-sign').classList.remove('hidden');
+          showToast(`💧 今天已經向許願池祈福過囉（連續第 ${data.streak} 天）`);
         } else {
-          showToast("⚠️ " + (data.message || "簽到失敗"));
+          showToast(`⚠️ ${data.message || '簽到失敗，請稍後再試'}`);
         }
       } catch (err) {
-        showToast("⚠️ 連線失敗，請檢查網路狀態");
+        showToast('⚠️ 連線失敗，請檢查網路狀態');
       } finally {
-        btn.disabled = false;
-        btn.textContent = "✨ 每日許願簽到";
+        isBusy = false;
       }
     }
 
     // =========================================
-    // 動作 2：智慧女神求籤（支援三欄＋3D翻卡）
+    // 2. 點擊左側女神像：求今日神諭（正面四行詩 ＋ 點擊 3D 翻轉背面解籤）
     // =========================================
-    async function handleDrawFortune() {
-      if (!player) return;
-      const btn = document.getElementById("btnFortune");
-      btn.disabled = true;
-      btn.textContent = "🔮 感應神諭中...";
+    async function triggerDrawFortune() {
+      if (isBusy) return;
+      isBusy = true;
+      showToast('🗽 智慧女神手中的星辰水晶球正在感應你的運勢...');
 
       try {
-        const res = await fetch(API_ENDPOINT, {
-          method: "POST",
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
           body: JSON.stringify({
-            action: "drawFortune",
+            action: 'drawFortune',
             studentId: player.studentId,
             nickname: player.nickname
           })
@@ -530,56 +388,46 @@
         const data = await res.json();
 
         if (data.success) {
-          if (data.alreadyDrawn) {
-            showToast("💡 今日已向女神求過籤囉！為你重新展開今日神諭（點擊卡片可翻面解籤）。");
-          } else {
-            showToast("✨ 智慧女神降下今日神諭！點擊詩籤可翻轉查看解籤。");
-          }
-          renderFortuneCard(data);
+          const cardEl = document.getElementById('fortune-card');
+          cardEl.classList.remove('is-flipped'); // 每次打開預設先顯示正面
+
+          const luckText = data.level || data.luck || '中吉';
+          const luckBadge = document.getElementById('card-luck');
+          luckBadge.textContent = luckText;
+          luckBadge.style.background = luckText.includes('凶') ? '#1e293b' : '#8b0000';
+
+          // 將四句詩依「，」或「。」自動拆成剛好 4 行
+          const lines = (data.poem || '')
+            .split(/[，。]/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+          document.getElementById('card-poem').innerHTML = lines
+            .map(line => `<div>${line}</div>`)
+            .join('');
+
+          // 背面解籤（把頓號「、」換成換行，條列更易讀）
+          const explainText = data.explain || '功名（平穩）、財運（安穩）、宜（平常心）、忌（急躁）';
+          document.getElementById('card-explain').innerHTML = explainText.replace(/、/g, '<br>');
+
+          document.getElementById('fortune-status-tag').textContent = data.alreadyDrawn
+            ? '💡 今日已求過神諭（點擊卡片可翻轉查看解籤）'
+            : '✨ 智慧女神降下今日新神諭！（點擊卡片可翻轉查看解籤）';
+
+          document.getElementById('modal-fortune').classList.remove('hidden');
+          showToast('🔮 智慧女神已揭示今日神諭，點擊詩籤卡片可翻面看解籤！');
         } else {
-          showToast("⚠️ " + (data.message || "求籤失敗"));
+          showToast(`⚠️ ${data.message || '求籤失敗，請稍後再試'}`);
         }
       } catch (err) {
-        showToast("⚠️ 連線失敗，請檢查網路狀態");
+        showToast('⚠️ 連線失敗，請檢查網路狀態');
       } finally {
-        btn.disabled = false;
-        btn.textContent = "🔮 向女神求今日籤";
+        isBusy = false;
       }
     }
 
-    // 渲染詩籤卡並打開彈窗
-    function renderFortuneCard(data) {
-      const card = document.getElementById("fortuneCard");
-      card.classList.remove("is-flipped");
-
-      const luckEl = document.getElementById("cardLuck");
-      const luckText = data.level || data.luck || "中吉";
-      luckEl.textContent = luckText;
-      luckEl.style.background = luckText.includes("凶") ? "#1e293b" : "#8b0000";
-
-      // 依「，」或「。」切成剛好 4 行
-      const lines = (data.poem || "")
-        .split(/[，。]/)
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
-
-      const poemContainer = document.getElementById("cardPoemLines");
-      poemContainer.innerHTML = lines.map(line => `<div>${line}</div>`).join("");
-
-      // 背面解籤條列呈現
-      const explainEl = document.getElementById("cardExplain");
-      const explainText = data.explain || "功名（平穩）、財運（安穩）、宜（平常心）、忌（急躁）";
-      explainEl.innerHTML = explainText.replace(/、/g, "<br>");
-
-      document.getElementById("fortuneModal").classList.add("active");
-    }
-
     function toggleFortuneCard() {
-      document.getElementById("fortuneCard").classList.toggle("is-flipped");
-    }
-
-    function closeFortuneModal() {
-      document.getElementById("fortuneModal").classList.remove("active");
+      document.getElementById('fortune-card').classList.toggle('is-flipped');
     }
   </script>
 </body>

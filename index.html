@@ -15,7 +15,8 @@
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
-  <img src="start_bg.png" alt="起始封面" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <!-- 讀取 image1 資料夾內的 webp 封面圖 -->
+  <img src="image1/start_bg.webp" alt="起始封面" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
 
   <div class="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
     <div class="rpg-panel pointer-events-auto w-full max-w-md p-6 rounded-2xl">
@@ -90,13 +91,14 @@
 
     async function submitAuth() {
       const classNum = document.getElementById('input-class').value.trim();
-      const seatNum = document.getElementById('input-seat').value.trim().padStart(2, '0');
+      const seatRaw = document.getElementById('input-seat').value.trim();
+      const seatNum = seatRaw ? seatRaw.padStart(2, '0') : '';
       const nickname = document.getElementById('input-nickname').value.trim();
-      const pinCode = document.getElementById('input-pin').value.trim();
+      const pin = document.getElementById('input-pin').value.trim();
       const msgEl = document.getElementById('auth-msg');
       const btn = document.getElementById('btn-submit');
 
-      if (!classNum || !seatNum || !pinCode) {
+      if (!classNum || !seatNum || !pin) {
         msgEl.textContent = "請完整填寫所有欄位！";
         return;
       }
@@ -109,6 +111,8 @@
         return;
       }
 
+      const studentId = `${classNum}${seatNum}`;
+
       btn.disabled = true;
       btn.textContent = authMode === 'login' ? "⏳ 讀取存檔中..." : "⏳ 正在向公會註冊角色...";
       msgEl.textContent = "";
@@ -116,15 +120,18 @@
       try {
         const res = await fetch(GAS_API_URL, {
           method: 'POST',
-          body: JSON.stringify({ action: authMode, classNum, seatNum, nickname, pinCode })
+          body: JSON.stringify({ action: authMode, studentId, classNum, seatNum, nickname, pin })
         });
         const data = await res.json();
 
         if (data.status === 'success') {
           savePlayerSession(data.player);
           sessionStorage.setItem('math_town_ann', JSON.stringify(data.announcement || {}));
-          sessionStorage.setItem('math_town_msgs', JSON.stringify(data.messages || []));
+          sessionStorage.setItem('math_town_msgs', JSON.stringify(data.board || data.messages || []));
           sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard || []));
+          if (Array.isArray(data.titlesCatalog) && data.titlesCatalog.length > 0) {
+            sessionStorage.setItem('math_town_titles', JSON.stringify(data.titlesCatalog));
+          }
           window.location.href = 'town.html';
         } else {
           msgEl.textContent = data.message || "操作失敗，請檢查輸入內容";

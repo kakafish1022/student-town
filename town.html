@@ -15,7 +15,6 @@
     .hotspot-label { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%) translateY(-4px); background: rgba(25,16,10,0.92); border: 1.5px solid #e5b567; color: #ffea9f; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
     .hotspot:hover .hotspot-label { opacity: 1; }
 
-
     .npc-walker {
       position: absolute;
       z-index: 30;
@@ -55,7 +54,8 @@
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
-  <img id="img-town" src="home1.png" alt="小鎮地圖" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <!-- 讀取 image1 資料夾內的 webp 小鎮底圖 -->
+  <img id="img-town" src="image1/home1.webp" alt="小鎮地圖" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="town-layer" class="absolute"></div>
 
   <!-- 頂部狀態列 -->
@@ -72,7 +72,7 @@
   <!-- 村莊佈告欄特寫彈窗 -->
   <div id="modal-board" class="hidden fixed inset-0 bg-black/85 z-40 flex items-center justify-center p-4">
     <div class="relative w-full max-w-5xl aspect-video flex items-center justify-center">
-      <img src="bulletin_board.png" alt="佈告欄" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+      <img src="image1/bulletin_board.webp" alt="佈告欄" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
 
       <button onclick="document.getElementById('modal-board').classList.add('hidden')" 
               style="left: 16.7%; top: 13%; width: 13.5%; height: 7.5%;"
@@ -122,7 +122,7 @@
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
-    // === 建築物熱區座標（許願池直接連結 fountain.html） ===
+    // === 建築物熱區座標 ===
     const TOWN_HOTSPOTS = [
       { id: "hall",     name: "🏛️ 城鎮中心",     url: "hall.html",     left: 41.0, top: 15.2, width: 17.0, height: 22.0 },
       { id: "tavern",   name: "🍺 冒險者酒館",   url: "tavern.html",   left: 15.7, top: 19.3, width: 13.7, height: 24.6 },
@@ -139,7 +139,7 @@
 
     const minLv = Math.min(...Object.values(player.buildings));
     const stage = Math.min(3, Math.max(1, minLv));
-    document.getElementById('img-town').src = `home${stage}.png`;
+    document.getElementById('img-town').src = `image1/home${stage}.webp`;
     document.getElementById('hud-stage').textContent = stage === 1 ? 'Lv.1 拓荒木屋村' : stage === 2 ? 'Lv.2 石造繁榮鎮' : 'Lv.3 黃金水晶之都';
 
     initHotspotLayer('img-town', 'town-layer', TOWN_HOTSPOTS, (item) => {
@@ -239,12 +239,12 @@
       return best;
     }
 
-    // === 【可自訂 PNG 角色系統：優先載入 img，尚未上傳圖檔時自動顯示 fallbackIcon】 ===
+    // === 【讀取 image1 資料夾內 webp 角色圖檔，載入失敗時自動顯示 fallbackIcon】 ===
     const NPC_LIST = [
-      { minStage: 1, img: "npc1.png", fallbackIcon: "🧙‍♂️", start: {x: 42, y: 71}, speed: 0.016, lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "走過石橋去看看風景～"] },
-      { minStage: 1, img: "npc2.png", fallbackIcon: "🐈",   start: {x: 22, y: 84}, speed: 0.024, lines: ["喵～佈告欄有新留言！", "喵嗚～追不到我吧！", "摸我一下會有好運喵！"] },
-      { minStage: 1, img: "npc3.png", fallbackIcon: "🗡️",   start: {x: 68, y: 62}, speed: 0.020, lines: ["今天去許願池簽到了嗎？", "智慧女神今天會抽到什麼籤呢？", "一起把小鎮升到 Lv.3 吧！"] },
-      { minStage: 2, img: "npc4.png", fallbackIcon: "🧝‍♀️", start: {x: 28, y: 52}, speed: 0.015, lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"] }
+      { minStage: 1, img: "image1/npc1.webp", fallbackIcon: "🧙‍♂️", start: {x: 42, y: 71}, speed: 0.016, lines: ["負負得正別忘記！", "快去城鎮中心升級吧！", "走過石橋去看看風景～"] },
+      { minStage: 1, img: "image1/npc2.webp", fallbackIcon: "🐈",   start: {x: 22, y: 84}, speed: 0.024, lines: ["喵～佈告欄有新留言！", "喵嗚～追不到我吧！", "摸我一下會有好運喵！"] },
+      { minStage: 1, img: "image1/npc3.webp", fallbackIcon: "🗡️",   start: {x: 68, y: 62}, speed: 0.020, lines: ["今天去許願池簽到了嗎？", "智慧女神今天會抽到什麼籤呢？", "一起把小鎮升到 Lv.3 吧！"] },
+      { minStage: 2, img: "image1/npc4.webp", fallbackIcon: "🧝‍♀️", start: {x: 28, y: 52}, speed: 0.015, lines: ["石造小鎮變好漂亮！", "乘方運算要看清楚括號喔！", "向 Lv.3 水晶之都邁進！"] }
     ];
 
     let npcState = [];
@@ -387,15 +387,19 @@
       const msgs = JSON.parse(sessionStorage.getItem('math_town_msgs') || '[]');
       const box = document.getElementById('msg-list');
       const colors = ['bg-pink-200 text-pink-950', 'bg-sky-200 text-sky-950', 'bg-amber-200 text-amber-950', 'bg-emerald-200 text-emerald-950'];
-      box.innerHTML = msgs.map((m, idx) => `<div class="${colors[idx % colors.length]} p-1.5 rounded shadow text-xs"><b>${m.classNum} ${m.nickname}：</b>${m.content}</div>`).join('');
+      box.innerHTML = msgs.map((m, idx) => {
+        const text = m.message || m.content || '';
+        return `<div class="${colors[idx % colors.length]} p-1.5 rounded shadow text-xs"><b>${m.classNum} ${m.nickname}：</b>${text}</div>`;
+      }).join('');
     }
 
     async function postMsg() {
       const input = document.getElementById('input-msg');
-      const content = input.value.trim();
-      if (!content) return;
+      const message = input.value.trim();
+      if (!message) return;
+      const title = (player.stats && player.stats.equippedTitle) || '初出茅廬';
       const msgs = JSON.parse(sessionStorage.getItem('math_town_msgs') || '[]');
-      msgs.unshift({ classNum: player.classNum, nickname: player.nickname, content });
+      msgs.unshift({ classNum: player.classNum, nickname: player.nickname, title, message });
       sessionStorage.setItem('math_town_msgs', JSON.stringify(msgs));
       input.value = '';
       renderMsgs();
@@ -403,10 +407,25 @@
       if (GAS_API_URL) {
         fetch(GAS_API_URL, {
           method: 'POST',
-          body: JSON.stringify({ action: 'postMessage', studentId: player.studentId, classNum: player.classNum, nickname: player.nickname, content })
+          body: JSON.stringify({
+            action: 'postBoard',
+            studentId: player.studentId,
+            classNum: player.classNum,
+            nickname: player.nickname,
+            title,
+            message
+          })
         });
       }
     }
+
+    // 背景預先載入各棟建築室內 webp 底圖，點擊進入瞬間秒開
+    setTimeout(() => {
+      ['image1/hall.webp', 'image1/tavern.webp', 'image1/alchemy.webp', 'image1/fountain.webp', 'image1/ranch.webp'].forEach(src => {
+        const preloadImg = new Image();
+        preloadImg.src = src;
+      });
+    }, 1500);
   </script>
 </body>
 </html>

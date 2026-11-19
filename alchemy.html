@@ -101,8 +101,8 @@
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
-  <!-- 滿版魔法煉金室底圖 -->
-  <img id="img-alchemy" src="alchemy.png" alt="魔法煉金室" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <!-- 滿版魔法煉金室底圖（讀取 image1 資料夾內 webp） -->
+  <img id="img-alchemy" src="image1/alchemy.webp" alt="魔法煉金室" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="alchemy-layer" class="absolute"></div>
 
   <!-- 左上角返回按鈕 -->
@@ -228,7 +228,7 @@
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
-    // 精準對應 alchemy.png 構圖的四大互動熱區
+    // 精準對應 alchemy.webp 構圖的四大互動熱區
     const ALCHEMY_HOTSPOTS = [
       { id: "exit",         name: "🚪 返回小鎮地圖",         left: 2.0,  top: 23.0, width: 17.0, height: 42.0 },
       { id: "shop",         name: "🧪 奇幻魔藥與道具商城",   left: 23.0, top: 8.0,  width: 35.0, height: 32.0 },

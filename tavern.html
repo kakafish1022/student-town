@@ -100,8 +100,8 @@
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
-  <!-- 滿版酒館底圖 -->
-  <img id="img-tavern" src="tavern.png" alt="冒險者酒館" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <!-- 滿版酒館底圖（讀取 image1 資料夾內的 webp） -->
+  <img id="img-tavern" src="image1/tavern.webp" alt="冒險者酒館" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="tavern-layer" class="absolute"></div>
 
   <!-- 左上角返回按鈕 -->
@@ -249,7 +249,7 @@
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
-    // 精準對應 tavern.png 構圖的四大互動熱區
+    // 精準對應 tavern.webp 構圖的四大互動熱區
     const TAVERN_HOTSPOTS = [
       { id: "exit",     name: "🚪 返回小鎮地圖",           left: 1.5,  top: 48.0, width: 15.0, height: 36.0 },
       { id: "quests",   name: "📜 每日任務：外部遊戲委託牆", left: 7.0,  top: 13.0, width: 27.0, height: 34.0 },
@@ -505,12 +505,14 @@
     }
 
     // =========================================================
-    // 2. 自由任務：吧檯快問快答（科目 + 單元下拉選單）
+    // 2. 自由任務：吧檯快問快答（科目 + 單元下拉選單 + 不重複洗牌）
     // =========================================================
     let freeSubject = '數學';
     let freeUnit = 'ALL';
     let rewardTarget = 'gold';
     let currentFreeQ = null;
+    let shuffledQueue = [];
+    let lastUnitKey = '';
 
     function openFreeModal() {
       updateFreeStatusUI();
@@ -584,7 +586,18 @@
       }
       const list = pool.length > 0 ? pool : QUESTION_BANK;
       document.getElementById('unit-q-count').textContent = `目前題池：${list.length} 題`;
-      currentFreeQ = list[Math.floor(Math.random() * list.length)];
+
+      const currentKey = `${freeSubject}__${freeUnit}__${list.length}`;
+      if (currentKey !== lastUnitKey || shuffledQueue.length === 0) {
+        lastUnitKey = currentKey;
+        shuffledQueue = [...list];
+        for (let i = shuffledQueue.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledQueue[i], shuffledQueue[j]] = [shuffledQueue[j], shuffledQueue[i]];
+        }
+      }
+
+      currentFreeQ = shuffledQueue.pop();
 
       const box = document.getElementById('free-quiz-box');
       box.innerHTML = `

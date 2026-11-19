@@ -157,8 +157,8 @@
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
-  <!-- 滿版奇幻寵物牧場像素底圖 -->
-  <img id="img-ranch" src="ranch.png" alt="奇幻寵物牧場" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <!-- 滿版奇幻寵物牧場像素底圖（讀取 image1 資料夾內 webp） -->
+  <img id="img-ranch" src="image1/ranch.webp" alt="奇幻寵物牧場" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="ranch-layer" class="absolute"></div>
 
   <!-- 左上角返回按鈕 -->
@@ -252,7 +252,7 @@
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
 
-    // 精準對應 ranch.png 構圖的三大互動熱區
+    // 精準對應 ranch.webp 構圖的三大互動熱區
     const RANCH_HOTSPOTS = [
       { id: "hatchery", name: "🥚 神秘蛋孵化屋",     left: 10.0, top: 8.0,  width: 28.0, height: 32.0 },
       { id: "barn",     name: "📖 寵物圖鑑與餵養中心", left: 62.0, top: 5.0,  width: 34.0, height: 37.0 },
@@ -260,18 +260,18 @@
     ];
 
     // =========================================================
-    // 奇幻數學寵物資料庫（9 種精靈，支援 png 優先 / emoji 備援）
+    // 奇幻數學寵物資料庫（9 種精靈，讀取 image1/pet_p0x.webp 優先 / emoji 備援）
     // =========================================================
     const PET_CATALOG = {
-      p01: { id: 'p01', name: '森林小幼苗', type: 'wood',  img: 'pet_p01.png', icon: '🌱', skill: '酒館答題木材獎勵 +25%', lines: ['多算一題，我就多長一片葉子！', '括號外面有負號要變號喔！', '木材可以讓我快快長大！'] },
-      p02: { id: 'p02', name: '算盤小赤狐', type: 'gold',  img: 'pet_p02.png', icon: '🦊', skill: '酒館答題金幣獎勵 +20%', lines: ['嘿嘿，這題的心算難不倒我！', '金幣閃閃發亮，再多解幾題吧！', '移項法則記得要變號喔！'] },
-      p03: { id: 'p03', name: '圓周小麻雀', type: 'wood',  img: 'pet_p03.png', icon: '🐤', skill: '酒館答題額外獲得 +5 金幣', lines: ['啾啾！3.1415926～', '今天也要元氣滿滿解數學！', '飛高高看小鎮好漂亮！'] },
-      p04: { id: 'p04', name: '幾何岩甲龜', type: 'stone', img: 'pet_p04.png', icon: '🐢', skill: '酒館答錯時保護連勝不斷線', lines: ['慢慢算、看清楚題目最穩當！', '石頭咬起來脆脆的超好吃～', '三角形內角和是 180 度喔！'] },
-      p05: { id: 'p05', name: '星光史萊姆', type: 'gold',  img: 'pet_p05.png', icon: '💧', skill: '許願池與酒館金幣 +25%', lines: ['咕嚕咕嚕～我會變形喔！', '負負得正、正負得負，記住了嗎？', '水池旁邊涼涼的好舒服～'] },
-      p06: { id: 'p06', name: '水晶獨角獸', type: 'stone', img: 'pet_p06.png', icon: '🦄', skill: '酒館答題石頭獎勵 +30%', lines: ['只有細心的勇者才能駕馭我！', '直角三角形斜邊平方等於兩股平方和！', '全鎮升到 Lv.3 會超壯觀喔！'] },
-      p07: { id: 'p07', name: '畢氏小金龍', type: 'gold',  img: 'pet_p07.png', icon: '🐲', skill: '全資源（金/木/石）獎勵 +25%', lines: ['吼嗚！我是傳說中的數學聖獸！', '任何方程式在我面前都能瞬間破解！', '帶著我出戰，賞金拿到手軟！'] },
-      p08: { id: 'p08', name: '智慧貓頭鷹', type: 'wood',  img: 'pet_p08.png', icon: '🦉', skill: '酒館每場任務獲得 1 次提示護盾', lines: ['咕咕～先乘除後加減，別粗心！', '夜晚的星空藏著幾何的奧秘。', '遇到難題先深呼吸畫個圖吧！'] },
-      p09: { id: 'p09', name: '黃金不死鳥', type: 'stone', img: 'pet_p09.png', icon: '🦅', skill: '連勝 3 題以上金幣獎勵翻倍', lines: ['浴火重生的數學之魂燃燒吧！', '你的計算速度已經超越常人了！', '繼續保持連勝紀錄吧！'] }
+      p01: { id: 'p01', name: '森林小幼苗', type: 'wood',  img: 'image1/pet_p01.webp', icon: '🌱', skill: '酒館答題木材獎勵 +25%', lines: ['多算一題，我就多長一片葉子！', '括號外面有負號要變號喔！', '木材可以讓我快快長大！'] },
+      p02: { id: 'p02', name: '算盤小赤狐', type: 'gold',  img: 'image1/pet_p02.webp', icon: '🦊', skill: '酒館答題金幣獎勵 +20%', lines: ['嘿嘿，這題的心算難不倒我！', '金幣閃閃發亮，再多解幾題吧！', '移項法則記得要變號喔！'] },
+      p03: { id: 'p03', name: '圓周小麻雀', type: 'wood',  img: 'image1/pet_p03.webp', icon: '🐤', skill: '酒館答題額外獲得 +5 金幣', lines: ['啾啾！3.1415926～', '今天也要元氣滿滿解數學！', '飛高高看小鎮好漂亮！'] },
+      p04: { id: 'p04', name: '幾何岩甲龜', type: 'stone', img: 'image1/pet_p04.webp', icon: '🐢', skill: '酒館答錯時保護連勝不斷線', lines: ['慢慢算、看清楚題目最穩當！', '石頭咬起來脆脆的超好吃～', '三角形內角和是 180 度喔！'] },
+      p05: { id: 'p05', name: '星光史萊姆', type: 'gold',  img: 'image1/pet_p05.webp', icon: '💧', skill: '許願池與酒館金幣 +25%', lines: ['咕嚕咕嚕～我會變形喔！', '負負得正、正負得負，記住了嗎？', '水池旁邊涼涼的好舒服～'] },
+      p06: { id: 'p06', name: '水晶獨角獸', type: 'stone', img: 'image1/pet_p06.webp', icon: '🦄', skill: '酒館答題石頭獎勵 +30%', lines: ['只有細心的勇者才能駕馭我！', '直角三角形斜邊平方等於兩股平方和！', '全鎮升到 Lv.3 會超壯觀喔！'] },
+      p07: { id: 'p07', name: '畢氏小金龍', type: 'gold',  img: 'image1/pet_p07.webp', icon: '🐲', skill: '全資源（金/木/石）獎勵 +25%', lines: ['吼嗚！我是傳說中的數學聖獸！', '任何方程式在我面前都能瞬間破解！', '帶著我出戰，賞金拿到手軟！'] },
+      p08: { id: 'p08', name: '智慧貓頭鷹', type: 'wood',  img: 'image1/pet_p08.webp', icon: '🦉', skill: '酒館每場任務獲得 1 次提示護盾', lines: ['咕咕～先乘除後加減，別粗心！', '夜晚的星空藏著幾何的奧秘。', '遇到難題先深呼吸畫個圖吧！'] },
+      p09: { id: 'p09', name: '黃金不死鳥', type: 'stone', img: 'image1/pet_p09.webp', icon: '🦅', skill: '連勝 3 題以上金幣獎勵翻倍', lines: ['浴火重生的數學之魂燃燒吧！', '你的計算速度已經超越常人了！', '繼續保持連勝紀錄吧！'] }
     };
 
     // 三種神秘蛋設定

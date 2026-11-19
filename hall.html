@@ -17,7 +17,8 @@
   </style>
 </head>
 <body class="w-screen h-screen flex items-center justify-center relative">
-  <img id="img-hall" src="town_hall.png" alt="城鎮中心" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <!-- 讀取 image1 資料夾內的 webp 城鎮中心底圖 -->
+  <img id="img-hall" src="image1/town_hall.webp" alt="城鎮中心" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="hall-layer" class="absolute"></div>
 
   <!-- 頂部導覽 -->
@@ -129,7 +130,7 @@
     }
 
     async function upgrade(k) {
-      if (isSaving) return; // 防止連點重複扣款
+      if (isSaving) return;
       const lv = player.buildings[k] || 1;
       if (lv >= 3 || player.gold < lv*100 || player.wood < lv*60 || player.stone < lv*40) {
         return alert("資源不足喔！快去冒險者酒館賺取資源吧！");
@@ -155,7 +156,10 @@
     function openRank() {
       const ranks = JSON.parse(sessionStorage.getItem('math_town_rank') || '[]');
       document.getElementById('rank-list').innerHTML = ranks.length
-        ? ranks.map((r, i) => `<div class="flex justify-between bg-stone-900 px-4 py-2 rounded-xl border border-amber-800 text-sm"><span>#${i+1} <b>${r.nickname}</b> (${r.classNum}班)</span><span class="text-amber-400 font-bold">${r.prosperity} 分</span></div>`).join('')
+        ? ranks.map((r, i) => {
+            const titleBadge = r.title ? `<span class="text-[11px] bg-amber-900/90 text-amber-200 border border-amber-500/70 px-1.5 py-0.5 rounded ml-1.5">${r.title}</span>` : '';
+            return `<div class="flex justify-between items-center bg-stone-900 px-4 py-2 rounded-xl border border-amber-800 text-sm"><span>#${i+1} <b>${r.nickname}</b> (${r.classNum}班)${titleBadge}</span><span class="text-amber-400 font-bold">${r.prosperity} 分</span></div>`;
+          }).join('')
         : `<div class="text-center text-sm text-stone-400 py-4">目前尚無雲端排行資料</div>`;
       document.getElementById('modal-rank').classList.remove('hidden');
     }
@@ -171,7 +175,7 @@
         manualBtn.textContent = '⏳ 雲端同步中...';
       }
       if (!document.getElementById('modal-sandbox').classList.contains('hidden')) {
-        openSandbox(); // 讓升級按鈕即時顯示「⏳ 同步中...」並鎖定
+        openSandbox();
       }
 
       try {
@@ -182,7 +186,6 @@
         const data = await res.json();
 
         if (data.status === 'success') {
-          // 同步更新最新全鎮繁榮度排行榜
           if (Array.isArray(data.leaderboard)) {
             sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard));
           }
@@ -199,7 +202,7 @@
           manualBtn.textContent = '💾 手動雲端存檔';
         }
         if (!document.getElementById('modal-sandbox').classList.contains('hidden')) {
-          openSandbox(); // 解鎖按鈕狀態
+          openSandbox();
         }
       }
     }

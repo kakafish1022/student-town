@@ -7,6 +7,16 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="config.js"></script>
   <style>
+      /* 隱藏所有區塊的預設捲軸（仍保留滾輪滑動功能） */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE / Edge */
+  }
+  *::-webkit-scrollbar {
+    display: none; /* Chrome / Safari / Edge */
+  }
+
+  /* 下面保留你原本的 CSS 樣式... */
     body {
       background: #120d0a;
       color: #f3e5ab;

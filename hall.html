@@ -70,7 +70,7 @@
         </div>
       </div>
       <div class="grid grid-cols-2 gap-3">
-        <button onclick="saveToCloud(true)" class="rpg-btn py-2.5 rounded-xl text-sm cursor-pointer">💾 手動雲端存檔</button>
+        <button id="btn-manual-save" onclick="saveToCloud(true)" class="rpg-btn py-2.5 rounded-xl text-sm cursor-pointer">💾 手動雲端存檔</button>
         <button onclick="logout()" class="bg-red-900 hover:bg-red-800 border border-red-400 text-red-100 font-bold py-2.5 rounded-xl text-sm cursor-pointer">🚪 登出 / 切換帳號</button>
       </div>
     </div>
@@ -89,6 +89,8 @@
     ];
 
     const META = { tavern: "🍺 冒險者酒館", hall: "🏛️ 城鎮中心", alchemy: "⚗️ 魔法煉金室", fountain: "⛲ 中央許願池", board: "📋 村莊佈告欄", ranch: "🐾 寵物牧場" };
+
+    let isSaving = false; // 防連點鎖
 
     function updateHUD() {
       document.getElementById('hud-gold').textContent = player.gold;
@@ -111,26 +113,43 @@
       box.innerHTML = Object.keys(META).map(k => {
         const lv = player.buildings[k] || 1;
         const max = lv >= 3;
+        const disabled = max || isSaving;
+        let btnText = '🔨 升級';
+        if (max) btnText = '已達上限';
+        else if (isSaving) btnText = '⏳ 同步中...';
+
         return `
           <div class="bg-stone-900/90 border border-amber-700 p-3 rounded-xl">
             <div class="flex justify-between mb-1"><b class="text-amber-200">${META[k]}</b><span class="text-xs bg-amber-900 px-2 rounded">Lv.${lv}/3</span></div>
             <div class="text-xs text-stone-300 mb-2">${max ? '✨ 已滿級' : `需求：🪙${lv*100} 🪵${lv*60} 🪨${lv*40}`}</div>
-            <button onclick="upgrade('${k}')" ${max ? 'disabled' : ''} class="${max ? 'bg-stone-700 text-stone-400' : 'rpg-btn cursor-pointer'} w-full py-1.5 rounded text-xs">${max ? '已達上限' : '🔨 升級'}</button>
+            <button onclick="upgrade('${k}')" ${disabled ? 'disabled' : ''} class="${disabled ? 'bg-stone-700 text-stone-400 cursor-not-allowed' : 'rpg-btn cursor-pointer'} w-full py-1.5 rounded text-xs">${btnText}</button>
           </div>`;
       }).join('');
       document.getElementById('modal-sandbox').classList.remove('hidden');
     }
 
-    function upgrade(k) {
+    async function upgrade(k) {
+      if (isSaving) return; // 防止連點重複扣款
       const lv = player.buildings[k] || 1;
-      if (lv >= 3 || player.gold < lv*100 || player.wood < lv*60 || player.stone < lv*40) return alert("資源不足喔！快去冒險者酒館賺取資源吧！");
+      if (lv >= 3 || player.gold < lv*100 || player.wood < lv*60 || player.stone < lv*40) {
+        return alert("資源不足喔！快去冒險者酒館賺取資源吧！");
+      }
+
       const oldMin = Math.min(...Object.values(player.buildings));
-      player.gold -= lv*100; player.wood -= lv*60; player.stone -= lv*40;
+      player.gold -= lv*100;
+      player.wood -= lv*60;
+      player.stone -= lv*40;
       player.buildings[k] = lv + 1;
+
       savePlayerSession(player);
-      updateHUD(); openSandbox(); saveToCloud(false);
+      updateHUD();
+
       const newMin = Math.min(...Object.values(player.buildings));
-      if (newMin > oldMin) alert(`🎉 恭喜！全鎮 6 棟建築皆已達成 Lv.${newMin}！返回小鎮地圖即可看到城鎮大進化！`);
+      if (newMin > oldMin) {
+        alert(`🎉 恭喜！全鎮 6 棟建築皆已達成 Lv.${newMin}！返回小鎮地圖即可看到城鎮大進化！`);
+      }
+
+      await saveToCloud(false);
     }
 
     function openRank() {
@@ -142,9 +161,47 @@
     }
 
     async function saveToCloud(manual) {
+      if (isSaving) return;
       if (!GAS_API_URL) return manual && alert("尚未設定 GAS_API_URL！");
-      await fetch(GAS_API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveProgress', player }) });
-      if (manual) alert("✅ 雲端存檔成功！");
+
+      isSaving = true;
+      const manualBtn = document.getElementById('btn-manual-save');
+      if (manualBtn) {
+        manualBtn.disabled = true;
+        manualBtn.textContent = '⏳ 雲端同步中...';
+      }
+      if (!document.getElementById('modal-sandbox').classList.contains('hidden')) {
+        openSandbox(); // 讓升級按鈕即時顯示「⏳ 同步中...」並鎖定
+      }
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'saveProgress', player })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          // 同步更新最新全鎮繁榮度排行榜
+          if (Array.isArray(data.leaderboard)) {
+            sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard));
+          }
+          if (manual) alert("✅ 雲端存檔與排行榜同步成功！");
+        } else if (manual) {
+          alert("⚠️ 存檔失敗：" + (data.message || "請稍後再試"));
+        }
+      } catch (err) {
+        if (manual) alert("⚠️ 網路連線異常，請稍後再試！");
+      } finally {
+        isSaving = false;
+        if (manualBtn) {
+          manualBtn.disabled = false;
+          manualBtn.textContent = '💾 手動雲端存檔';
+        }
+        if (!document.getElementById('modal-sandbox').classList.contains('hidden')) {
+          openSandbox(); // 解鎖按鈕狀態
+        }
+      }
     }
 
     function logout() {

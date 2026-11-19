@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>奇幻許願池與智慧女神殿</title>
+  <script src="config.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -343,8 +344,8 @@
   <div class="top-bar">
     <button class="back-btn" onclick="goBackTown()">⬅ 返回小鎮</button>
     <div class="player-status">
-      <span id="uiNickname">冒險者</span>
-      <span>💰 <span id="uiGold">0</span></span>
+      <span id="uiNickname">勇者</span>
+      <span>🪙 <span id="uiGold">0</span></span>
       <span>🪵 <span id="uiWood">0</span></span>
       <span>🪨 <span id="uiStone">0</span></span>
     </div>
@@ -416,82 +417,45 @@
     <button class="close-modal-btn" onclick="closeFortuneModal()">收起神諭詩籤</button>
   </div>
 
- <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzzAYrRCU8RNzqKA5i5Z9i5KEngeswK4sAN3HKKALkTF4A-IVl-bRQVrfhkSGfKDEDgdA/exec";
-
-    let currentPlayer = null;
-    let foundStorage = null;   // localStorage 或 sessionStorage
-    let storageKey = "";       // 實際的 key 名稱
-    let isWrapped = false;     // 是否包在 .player 裡面
-
-    // 地毯式搜尋 sessionStorage 與 localStorage 裡的玩家存檔
-    function loadPlayerFromStorage() {
-      const storages = [sessionStorage, localStorage];
-      for (const store of storages) {
-        for (let i = 0; i < store.length; i++) {
-          const k = store.key(i);
-          try {
-            const parsed = JSON.parse(store.getItem(k));
-            if (!parsed || typeof parsed !== "object") continue;
-
-            // 情況 1：直接存 player 物件（含有 studentId 或 classNum+seatNum）
-            if (parsed.studentId || (parsed.classNum && parsed.seatNum)) {
-              if (!parsed.studentId) {
-                parsed.studentId = `${String(parsed.classNum).trim()}_${String(parsed.seatNum).trim().padStart(2, "0")}`;
-              }
-              foundStorage = store;
-              storageKey = k;
-              isWrapped = false;
-              return parsed;
-            }
-
-            // 情況 2：包在 { player: { studentId: ... } } 裡面
-            if (parsed.player && (parsed.player.studentId || parsed.player.classNum)) {
-              if (!parsed.player.studentId) {
-                parsed.player.studentId = `${String(parsed.player.classNum).trim()}_${String(parsed.player.seatNum).trim().padStart(2, "0")}`;
-              }
-              foundStorage = store;
-              storageKey = k;
-              isWrapped = true;
-              return parsed.player;
-            }
-          } catch (e) {}
-        }
-      }
-      return null;
+  <script>
+    // 直接使用 config.js 的 getPlayerSession() 與 GAS_API_URL
+    const player = typeof getPlayerSession === "function" ? getPlayerSession() : null;
+    if (!player) {
+      window.location.href = "index.html";
     }
 
-    // 寫回原本的儲存位置，確保返回小鎮時資源同步更新
-    function savePlayerToStorage() {
-      if (!currentPlayer || !foundStorage || !storageKey) return;
-      if (isWrapped) {
-        try {
-          const wrapper = JSON.parse(foundStorage.getItem(storageKey)) || {};
-          wrapper.player = currentPlayer;
-          foundStorage.setItem(storageKey, JSON.stringify(wrapper));
-        } catch (e) {}
+    const API_ENDPOINT = (typeof GAS_API_URL !== "undefined" && GAS_API_URL)
+      ? GAS_API_URL
+      : "https://script.google.com/macros/s/AKfycbzzAYrRCU8RNzqKA5i5Z9i5KEngeswK4sAN3HKKALkTF4A-IVl-bRQVrfhkSGfKDEDgdA/exec";
+
+    function syncPlayerSession(p) {
+      if (typeof savePlayerSession === "function") {
+        savePlayerSession(p);
       } else {
-        foundStorage.setItem(storageKey, JSON.stringify(currentPlayer));
+        // 備援：同步更新 sessionStorage / localStorage 內的 player 資料
+        [sessionStorage, localStorage].forEach(store => {
+          for (let i = 0; i < store.length; i++) {
+            const k = store.key(i);
+            try {
+              const obj = JSON.parse(store.getItem(k));
+              if (obj && obj.studentId === p.studentId) {
+                store.setItem(k, JSON.stringify(p));
+              }
+            } catch (e) {}
+          }
+        });
       }
     }
-
-    window.addEventListener("DOMContentLoaded", () => {
-      currentPlayer = loadPlayerFromStorage();
-      if (!currentPlayer) {
-        alert("找不到冒險者存檔，請先從大廳登入喔！");
-        window.location.href = "index.html";
-        return;
-      }
-      updateTopUI();
-    });
 
     function updateTopUI() {
-      if (!currentPlayer) return;
-      document.getElementById("uiNickname").textContent = currentPlayer.nickname || currentPlayer.studentId;
-      document.getElementById("uiGold").textContent = currentPlayer.gold ?? 0;
-      document.getElementById("uiWood").textContent = currentPlayer.wood ?? 0;
-      document.getElementById("uiStone").textContent = currentPlayer.stone ?? 0;
+      if (!player) return;
+      document.getElementById("uiNickname").textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
+      document.getElementById("uiGold").textContent = player.gold ?? 0;
+      document.getElementById("uiWood").textContent = player.wood ?? 0;
+      document.getElementById("uiStone").textContent = player.stone ?? 0;
     }
+
+    window.addEventListener("DOMContentLoaded", updateTopUI);
 
     function showToast(text) {
       const el = document.getElementById("toastMsg");
@@ -507,30 +471,30 @@
     // 動作 1：每日許願池簽到
     // =========================================
     async function handleDailySign() {
-      if (!currentPlayer) return;
+      if (!player) return;
       const btn = document.getElementById("btnSign");
       btn.disabled = true;
       btn.textContent = "⏳ 許願祈福中...";
 
       try {
-        const res = await fetch(GAS_URL, {
+        const res = await fetch(API_ENDPOINT, {
           method: "POST",
           body: JSON.stringify({
             action: "dailySign",
-            studentId: currentPlayer.studentId
+            studentId: player.studentId
           })
         });
         const data = await res.json();
 
         if (data.success) {
-          currentPlayer.gold = data.totals.gold;
-          currentPlayer.wood = data.totals.wood;
-          currentPlayer.stone = data.totals.stone;
-          savePlayerToStorage();
+          player.gold = data.totals.gold;
+          player.wood = data.totals.wood;
+          player.stone = data.totals.stone;
+          syncPlayerSession(player);
           updateTopUI();
           showToast(
             `✨ ${data.rewardTitle}（累積第 ${data.streak} 天）<br>` +
-            `獲得：💰+${data.reward.gold}、🪵+${data.reward.wood}、🪨+${data.reward.stone}`
+            `獲得：🪙+${data.reward.gold}、🪵+${data.reward.wood}、🪨+${data.reward.stone}`
           );
         } else if (data.alreadySigned) {
           showToast(`💧 ${data.message}（目前累積第 ${data.streak} 天）`);
@@ -549,18 +513,18 @@
     // 動作 2：智慧女神求籤（支援三欄＋3D翻卡）
     // =========================================
     async function handleDrawFortune() {
-      if (!currentPlayer) return;
+      if (!player) return;
       const btn = document.getElementById("btnFortune");
       btn.disabled = true;
       btn.textContent = "🔮 感應神諭中...";
 
       try {
-        const res = await fetch(GAS_URL, {
+        const res = await fetch(API_ENDPOINT, {
           method: "POST",
           body: JSON.stringify({
             action: "drawFortune",
-            studentId: currentPlayer.studentId,
-            nickname: currentPlayer.nickname
+            studentId: player.studentId,
+            nickname: player.nickname
           })
         });
         const data = await res.json();
@@ -593,6 +557,7 @@
       luckEl.textContent = luckText;
       luckEl.style.background = luckText.includes("凶") ? "#1e293b" : "#8b0000";
 
+      // 依「，」或「。」切成剛好 4 行
       const lines = (data.poem || "")
         .split(/[，。]/)
         .map(s => s.trim())
@@ -601,6 +566,7 @@
       const poemContainer = document.getElementById("cardPoemLines");
       poemContainer.innerHTML = lines.map(line => `<div>${line}</div>`).join("");
 
+      // 背面解籤條列呈現
       const explainEl = document.getElementById("cardExplain");
       const explainText = data.explain || "功名（平穩）、財運（安穩）、宜（平常心）、忌（急躁）";
       explainEl.innerHTML = explainText.replace(/、/g, "<br>");

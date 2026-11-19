@@ -215,7 +215,12 @@
   <!-- 滿版許願池與智慧女神底圖（讀取 image1 資料夾內 webp） -->
   <img id="img-fountain" src="image1/fountain.webp" alt="許願池與智慧女神" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
   <div id="fountain-layer" class="absolute"></div>
-
+<!-- 左上角返回按鈕 -->
+  <div class="absolute top-3 left-3 z-20">
+    <button onclick="window.location.href='town.html'" class="rpg-btn px-4 py-2 rounded-xl text-sm shadow-lg cursor-pointer flex items-center gap-1.5">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
   <!-- 右上角玩家資源狀態列 -->
   <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
     <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-4 text-sm">

@@ -416,44 +416,62 @@
     <button class="close-modal-btn" onclick="closeFortuneModal()">收起神諭詩籤</button>
   </div>
 
-  <script>
+ <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzzAYrRCU8RNzqKA5i5Z9i5KEngeswK4sAN3HKKALkTF4A-IVl-bRQVrfhkSGfKDEDgdA/exec";
 
     let currentPlayer = null;
-    let storageKey = "mathTownPlayer";
+    let foundStorage = null;   // localStorage 或 sessionStorage
+    let storageKey = "";       // 實際的 key 名稱
+    let isWrapped = false;     // 是否包在 .player 裡面
 
-    // 自動搜尋 localStorage 裡現有的玩家存檔（相容各種 key 命名）
+    // 地毯式搜尋 sessionStorage 與 localStorage 裡的玩家存檔
     function loadPlayerFromStorage() {
-      const candidateKeys = ["mathTownPlayer", "playerData", "currentPlayer", "math_town_player", "mathTownUser"];
-      for (const k of candidateKeys) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
+      const storages = [sessionStorage, localStorage];
+      for (const store of storages) {
+        for (let i = 0; i < store.length; i++) {
+          const k = store.key(i);
           try {
-            const parsed = JSON.parse(raw);
-            if (parsed && (parsed.studentId || parsed.classNum)) {
+            const parsed = JSON.parse(store.getItem(k));
+            if (!parsed || typeof parsed !== "object") continue;
+
+            // 情況 1：直接存 player 物件（含有 studentId 或 classNum+seatNum）
+            if (parsed.studentId || (parsed.classNum && parsed.seatNum)) {
+              if (!parsed.studentId) {
+                parsed.studentId = `${String(parsed.classNum).trim()}_${String(parsed.seatNum).trim().padStart(2, "0")}`;
+              }
+              foundStorage = store;
               storageKey = k;
+              isWrapped = false;
               return parsed;
+            }
+
+            // 情況 2：包在 { player: { studentId: ... } } 裡面
+            if (parsed.player && (parsed.player.studentId || parsed.player.classNum)) {
+              if (!parsed.player.studentId) {
+                parsed.player.studentId = `${String(parsed.player.classNum).trim()}_${String(parsed.player.seatNum).trim().padStart(2, "0")}`;
+              }
+              foundStorage = store;
+              storageKey = k;
+              isWrapped = true;
+              return parsed.player;
             }
           } catch (e) {}
         }
       }
-      // 若都沒命中，掃描整個 localStorage 尋找含有 studentId 的物件
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        try {
-          const parsed = JSON.parse(localStorage.getItem(k));
-          if (parsed && parsed.studentId) {
-            storageKey = k;
-            return parsed;
-          }
-        } catch (e) {}
-      }
       return null;
     }
 
+    // 寫回原本的儲存位置，確保返回小鎮時資源同步更新
     function savePlayerToStorage() {
-      if (currentPlayer && storageKey) {
-        localStorage.setItem(storageKey, JSON.stringify(currentPlayer));
+      if (!currentPlayer || !foundStorage || !storageKey) return;
+      if (isWrapped) {
+        try {
+          const wrapper = JSON.parse(foundStorage.getItem(storageKey)) || {};
+          wrapper.player = currentPlayer;
+          foundStorage.setItem(storageKey, JSON.stringify(wrapper));
+        } catch (e) {}
+      } else {
+        foundStorage.setItem(storageKey, JSON.stringify(currentPlayer));
       }
     }
 
@@ -486,7 +504,7 @@
     }
 
     // =========================================
-    // 動作 1：每日許願池簽到（對接 Code.gs 動作 E）
+    // 動作 1：每日許願池簽到
     // =========================================
     async function handleDailySign() {
       if (!currentPlayer) return;
@@ -528,7 +546,7 @@
     }
 
     // =========================================
-    // 動作 2：智慧女神求籤（對接 Code.gs 動作 F ＋ 3D翻卡）
+    // 動作 2：智慧女神求籤（支援三欄＋3D翻卡）
     // =========================================
     async function handleDrawFortune() {
       if (!currentPlayer) return;
@@ -568,45 +586,32 @@
     // 渲染詩籤卡並打開彈窗
     function renderFortuneCard(data) {
       const card = document.getElementById("fortuneCard");
-      card.classList.remove("is-flipped"); // 每次打開預設先呈現正面
+      card.classList.remove("is-flipped");
 
-      // 1. 設定籤運顏色與文字（兼容 level 與 luck 欄位）
       const luckEl = document.getElementById("cardLuck");
       const luckText = data.level || data.luck || "中吉";
       luckEl.textContent = luckText;
-      if (luckText.includes("凶")) {
-        luckEl.style.background = "#1e293b"; // 凶籤用深藍黑底金字
-      } else {
-        luckEl.style.background = "#8b0000"; // 吉籤用傳統朱紅底金字
-      }
+      luckEl.style.background = luckText.includes("凶") ? "#1e293b" : "#8b0000";
 
-      // 2. 將詩籤依逗號「，」與句號「。」切分成剛好 4 行
       const lines = (data.poem || "")
         .split(/[，。]/)
         .map(s => s.trim())
         .filter(s => s.length > 0);
 
       const poemContainer = document.getElementById("cardPoemLines");
-      poemContainer.innerHTML = lines
-        .map(line => `<div>${line}</div>`)
-        .join("");
+      poemContainer.innerHTML = lines.map(line => `<div>${line}</div>`).join("");
 
-      // 3. 設定背面解籤（把頓號「、」換成換行，條列更易讀）
       const explainEl = document.getElementById("cardExplain");
       const explainText = data.explain || "功名（平穩）、財運（安穩）、宜（平常心）、忌（急躁）";
       explainEl.innerHTML = explainText.replace(/、/g, "<br>");
 
-      // 顯示彈窗
       document.getElementById("fortuneModal").classList.add("active");
     }
 
-    // 點擊卡片翻轉正反面
     function toggleFortuneCard() {
-      const card = document.getElementById("fortuneCard");
-      card.classList.toggle("is-flipped");
+      document.getElementById("fortuneCard").classList.toggle("is-flipped");
     }
 
-    // 關閉彈窗
     function closeFortuneModal() {
       document.getElementById("fortuneModal").classList.remove("active");
     }

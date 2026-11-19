@@ -165,7 +165,7 @@
   </div>
 
   <!-- =========================================================
-       彈窗 2：中央煉金大釜 -> 4 選 1 比例濃度魔藥試煉（零打字）
+       彈窗 2：中央煉金大釜 -> 4 選 1 多題型比例魔藥試煉（零打字）
        ========================================================= -->
   <div id="modal-cauldron" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
     <div class="rpg-panel max-w-xl w-full p-6 rounded-2xl">
@@ -476,7 +476,7 @@
     }
 
     // =========================================================
-    // 2. 中央煉金大釜 -> 4 選 1 比例濃度試煉（零打字）
+    // 2. 中央煉金大釜 -> 5 大題型洗牌輪替比例試煉（零打字）
     // =========================================================
     function getTodayTrialCount() {
       const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
@@ -490,21 +490,121 @@
       sessionStorage.setItem(key, String(getTodayTrialCount() + 1));
     }
 
-    function generateRatioQuestion() {
-      const baseA = Math.floor(Math.random() * 4) + 2; // 2~5
-      const baseB = Math.floor(Math.random() * 5) + 3; // 3~7
-      const mult = Math.floor(Math.random() * 4) + 3;  // 3~6
-      const ans = baseB * mult;
-      const qText = `煉金配方中，「星光草汁」與「山泉水」的比例為 ${baseA} ： ${baseB}。若鍋中倒入了 ${baseA * mult} 毫升的星光草汁，請問需要加入多少毫升的山泉水？`;
+    function gcd(a, b) {
+      return b === 0 ? a : gcd(b, a % b);
+    }
 
-      const distractors = new Set([ans]);
-      while (distractors.size < 4) {
-        const offset = (Math.floor(Math.random() * 5) - 2) * baseB + (Math.floor(Math.random() * 5) - 2);
-        const cand = ans + offset;
-        if (cand > 0 && cand !== ans) distractors.add(cand);
+    function buildRatioChoices(qText, correctText, wrongList) {
+      const uniqueWrongs = Array.from(new Set(wrongList.filter(w => w !== correctText))).slice(0, 3);
+      while (uniqueWrongs.length < 3) {
+        uniqueWrongs.push(`${Math.floor(Math.random() * 25) + 2} 毫升`);
       }
-      const options = Array.from(distractors).sort(() => Math.random() - 0.5);
-      return { qText, ans, options };
+      const options = [
+        { text: correctText, isCorrect: true },
+        ...uniqueWrongs.map(w => ({ text: w, isCorrect: false }))
+      ].sort(() => Math.random() - 0.5);
+      return { qText, options };
+    }
+
+    let alchemyTypeQueue = [];
+
+    function generateRatioQuestion() {
+      // 5 種不同結構的比例題型洗牌輪替，避免連續出現同一種句型
+      if (alchemyTypeQueue.length === 0) {
+        alchemyTypeQueue = [1, 2, 3, 4, 5].sort(() => Math.random() - 0.5);
+      }
+      const qType = alchemyTypeQueue.pop();
+
+      const ingredients = [
+        { name: '星光草汁' },
+        { name: '山泉水' },
+        { name: '月光露滴' },
+        { name: '火蜥蜴粉末' }
+      ].sort(() => Math.random() - 0.5);
+      const A = ingredients[0].name;
+      const B = ingredients[1].name;
+      const C = ingredients[2].name;
+
+      const baseRatios = [[2, 3], [3, 4], [2, 5], [3, 5], [4, 5], [3, 7], [5, 6]];
+      const [r1, r2] = baseRatios[Math.floor(Math.random() * baseRatios.length)];
+
+      // 題型 1：雙材料基礎比例（擴大倍率 3~9 倍）
+      if (qType === 1) {
+        const mult = Math.floor(Math.random() * 7) + 3; // 3 ~ 9
+        const givenA = r1 * mult;
+        const ans = r2 * mult;
+        return buildRatioChoices(
+          `【基礎配方】煉金配方中，「${A}」與「${B}」的比例為 <b>${r1} ： ${r2}</b>。若鍋中倒入了 <b>${givenA} 毫升</b>的${A}，請問需要加入多少毫升的${B}？`,
+          `${ans} 毫升`,
+          [`${ans + r2} 毫升`, `${Math.max(2, ans - r1)} 毫升`, `${r1 * r2} 毫升`]
+        );
+      }
+
+      // 題型 2：小數或分數比例化簡為「最簡整數比」
+      if (qType === 2) {
+        if (Math.random() < 0.5) {
+          const factor = [0.5, 0.2, 1.5][Math.floor(Math.random() * 3)];
+          const d1 = Number((r1 * factor).toFixed(1));
+          const d2 = Number((r2 * factor).toFixed(1));
+          return buildRatioChoices(
+            `【配方純化】古籍記載「${A}」與「${B}」的原始比例為 <b>${d1} ： ${d2}</b>，請將此比例化為<b>最簡整數比</b>以啟動煉金陣！`,
+            `${r1} ： ${r2}`,
+            [`${r2} ： ${r1}`, `${r1 * 2} ： ${r2 * 2}`, `${r1 + 1} ： ${r2 + 1}`]
+          );
+        } else {
+          return buildRatioChoices(
+            `【分數調和】坩堝中「${A}」與「${B}」的濃度比為 <b>1/${r2} ： 1/${r1}</b>，請將它化為<b>最簡整數比</b>！`,
+            `${r1} ： ${r2}`,
+            [`${r2} ： ${r1}`, `1 ： ${r1 * r2}`, `${r1 + r2} ： ${r2}`]
+          );
+        }
+      }
+
+      // 題型 3：總量按比例分配
+      if (qType === 3) {
+        const mult = Math.floor(Math.random() * 6) + 3; // 3 ~ 8
+        const total = (r1 + r2) * mult;
+        const ans = r2 * mult;
+        return buildRatioChoices(
+          `【總量分配】本次融合總共需要調配 <b>${total} 毫升</b>混合液，且「${A}」：「${B}」＝ <b>${r1} ： ${r2}</b>。請問其中「${B}」佔了多少毫升？`,
+          `${ans} 毫升`,
+          [`${r1 * mult} 毫升`, `${ans + mult} 毫升`, `${Math.floor(total / 2)} 毫升`]
+        );
+      }
+
+      // 題型 4：三連比配方融合
+      if (qType === 4) {
+        const triplePresets = [
+          { ab: '2 ： 3', bc: '3 ： 5', a: 2, c: 5 },
+          { ab: '3 ： 4', bc: '4 ： 7', a: 3, c: 7 },
+          { ab: '2 ： 3', bc: '6 ： 5', a: 4, c: 5 },
+          { ab: '3 ： 2', bc: '4 ： 5', a: 6, c: 5 }
+        ];
+        const p = triplePresets[Math.floor(Math.random() * triplePresets.length)];
+        const mult = Math.floor(Math.random() * 4) + 2; // 2 ~ 5
+        const givenC = p.c * mult;
+        const ansA = p.a * mult;
+        return buildRatioChoices(
+          `【秘傳連比】配方顯示「${A}」：「${B}」＝ <b>${p.ab}</b>，且「${B}」：「${C}」＝ <b>${p.bc}</b>。若已倒入 <b>${givenC} 毫升</b>的${C}，需搭配多少毫升的${A}？`,
+          `${ansA} 毫升`,
+          [`${ansA + p.a} 毫升`, `${givenC + 2} 毫升`, `${Math.max(2, ansA - 2)} 毫升`]
+        );
+      }
+
+      // 題型 5：二次追加材料後的新比例
+      const mult = Math.floor(Math.random() * 3) + 2; // 2 ~ 4
+      const curA = r1 * mult;
+      const curB = r2 * mult;
+      const addA = r2;
+      const newA = curA + addA;
+      const g = gcd(newA, curB);
+      const simA = newA / g;
+      const simB = curB / g;
+      return buildRatioChoices(
+        `【二次調配】鍋內原有${A} <b>${curA} 毫升</b>、${B} <b>${curB} 毫升</b>。若再額外加入 <b>${addA} 毫升</b>的${A}，則新的「${A} ： ${B}」最簡整數比為何？`,
+        `${simA} ： ${simB}`,
+        [`${r1} ： ${r2}`, `${simB} ： ${simA}`, `${simA + 1} ： ${simB}`]
+      );
     }
 
     let currentTrialQ = null;
@@ -530,9 +630,9 @@
             📜 配方難題：${currentTrialQ.qText}
           </div>
           <div class="grid grid-cols-2 gap-3">
-            ${currentTrialQ.options.map(opt => `
-              <button onclick="submitRatioAnswer(${opt})" class="rpg-btn py-3.5 rounded-xl text-base md:text-lg cursor-pointer shadow">
-                ${opt} 毫升
+            ${currentTrialQ.options.map((opt, idx) => `
+              <button onclick="submitRatioAnswer(${idx})" class="rpg-btn py-3.5 rounded-xl text-base md:text-lg cursor-pointer shadow">
+                ${opt.text}
               </button>
             `).join('')}
           </div>
@@ -542,10 +642,12 @@
       document.getElementById('modal-cauldron').classList.remove('hidden');
     }
 
-    async function submitRatioAnswer(selected) {
+    async function submitRatioAnswer(selectedIdx) {
       if (!currentTrialQ || isSaving) return;
       addTodayTrialCount();
-      const isCorrect = (selected === currentTrialQ.ans);
+      const chosen = currentTrialQ.options[selectedIdx];
+      const isCorrect = Boolean(chosen && chosen.isCorrect);
+      const correctObj = currentTrialQ.options.find(o => o.isCorrect);
       currentTrialQ = null;
 
       if (isCorrect) {
@@ -560,7 +662,7 @@
         savePlayerSession(player);
         await syncAlchemyCloud();
       } else {
-        showToast('💥 比例調配失誤，鍋子冒出一陣黑煙！（今日試煉次數 -1）');
+        showToast(`💥 比例調配失誤（正解：${correctObj ? correctObj.text : ''}），鍋子冒出一陣黑煙！（今日試煉次數 -1）`);
       }
 
       openCauldronModal();
@@ -611,7 +713,6 @@
       renderTitlesAndGacha();
       document.getElementById('modal-titles').classList.remove('hidden');
 
-      // 背景向 GAS 抓取最新 Titles 表單設定
       if (GAS_API_URL) {
         try {
           const res = await fetch(GAS_API_URL, {
@@ -626,7 +727,6 @@
         } catch (e) { /* 網路異常時沿用快取 */ }
       }
 
-      // 檢查成就型頭銜是否達成條件
       let newlyUnlocked = [];
       TITLE_CATALOG.forEach(t => {
         if (t.type === 'achievement' && !player.stats.titles.includes(t.id) && checkTitleCondition(t)) {
@@ -742,7 +842,6 @@
         resultMsg = '🌈 傳說級大爆發！！盲盒開出【🪙+150 🪵+50 🪨+50】超級大禮包！';
       }
 
-      // 順便檢查是否有達成盲盒次數相關成就
       TITLE_CATALOG.forEach(t => {
         if (t.type === 'achievement' && !player.stats.titles.includes(t.id) && checkTitleCondition(t)) {
           player.stats.titles.push(t.id);

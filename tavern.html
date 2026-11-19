@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>數學奇幻小鎮 - 冒險者酒館</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+  <style>
+    body {
+      background: #120d0a;
+      color: #f3e5ab;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+      user-select: none;
+    }
+
+    .rpg-panel {
+      background: linear-gradient(145deg, #2b1d14, #1c120c);
+      border: 3px solid #c89d54;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.9);
+    }
+
+    .rpg-btn {
+      background: linear-gradient(180deg, #e5b567, #b88232);
+      border: 2px solid #fff2cc;
+      color: #231409;
+      font-weight: 900;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .rpg-btn:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: scale(1.02);
+    }
+
+    .rpg-btn:disabled {
+      background: #3f3226;
+      border-color: #6b5642;
+      color: #8c7662;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .hotspot {
+      position: absolute;
+      cursor: pointer;
+      border-radius: 16px;
+      transition: background 0.2s, box-shadow 0.2s;
+      z-index: 15;
+    }
+
+    .hotspot:hover {
+      background: rgba(251, 191, 36, 0.22);
+      box-shadow: 0 0 24px rgba(251, 191, 36, 0.7);
+    }
+
+    .hotspot-label {
+      position: absolute;
+      top: 6%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.95);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+    }
+
+    .hotspot:hover .hotspot-label {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    .loading-toast {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.95);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 14px;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+      max-width: 92vw;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex items-center justify-center relative">
+  <!-- 滿版酒館底圖 -->
+  <img id="img-tavern" src="tavern.png" alt="冒險者酒館" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <div id="tavern-layer" class="absolute"></div>
+
+  <!-- 左上角返回按鈕 -->
+  <div class="absolute top-3 left-3 z-20">
+    <button onclick="window.location.href='town.html'" class="rpg-btn px-4 py-2 rounded-xl text-sm shadow-lg cursor-pointer flex items-center gap-1.5">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
+
+  <!-- 右上角玩家資源與等級 -->
+  <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-3 md:gap-4 text-xs md:text-sm">
+      <span class="text-amber-400 font-black" id="hud-name">勇者</span>
+      <span>🪙 <b id="hud-gold">0</b></span>
+      <span>🪵 <b id="hud-wood">0</b></span>
+      <span>🪨 <b id="hud-stone">0</b></span>
+      <span class="text-xs bg-amber-950 px-2.5 py-0.5 rounded-full border border-amber-500 text-amber-200" id="hud-tavern-lv">酒館 Lv.1</span>
+    </div>
+  </div>
+
+  <!-- 底部操作提示 -->
+  <div id="toast-box" class="loading-toast">
+    🍺 點擊左側【任務布告欄】挑戰每日外部小遊戲（每日任選 3 款領賞）、中央【吧檯】自由選單元刷題賺資源！
+  </div>
+
+  <!-- =========================================================
+       彈窗 1：左側布告欄 -> 每日任務（外部遊戲委託牆）
+       ========================================================= -->
+  <div id="modal-quests" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-4xl w-full p-5 md:p-6 rounded-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-3">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">📜 每日任務：冒險遊戲委託牆</h2>
+          <p class="text-xs text-amber-200/85 mt-0.5">
+            每天可自由挑選任意 <b class="text-emerald-300">3 款</b> 遊戲領取每日固定委託賞金（🪙+50 🪵+35 🪨+25）！（今日剩餘領獎次數：<b id="quest-quota-left" class="text-amber-300 text-sm">3</b> / 3 次）
+          </p>
+        </div>
+        <button onclick="closeModal('modal-quests')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 科目篩選鈕 -->
+      <div id="quest-subject-tabs" class="flex flex-wrap gap-2 mb-3"></div>
+
+      <!-- 任務卡片列表 -->
+      <div id="quest-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-y-auto pr-1 flex-1"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 1-B：內嵌外部小遊戲 Iframe 視窗
+       ========================================================= -->
+  <div id="modal-iframe" class="hidden fixed inset-0 bg-black/95 z-50 flex flex-col p-2 md:p-4">
+    <div class="rpg-panel px-4 py-2.5 rounded-t-2xl flex flex-wrap justify-between items-center gap-2">
+      <div class="flex items-center gap-2">
+        <span id="iframe-subject-tag" class="text-xs bg-amber-900 text-amber-200 border border-amber-500 px-2 py-0.5 rounded font-bold">數學</span>
+        <span id="iframe-quest-title" class="font-black text-base md:text-lg text-amber-300">冒險任務</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-claim-quest" onclick="claimCurrentQuestReward()" class="rpg-btn px-4 py-1.5 rounded-xl text-xs md:text-sm cursor-pointer">
+          🎁 完成任務領取賞金
+        </button>
+        <button onclick="closeGameIframe()" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold cursor-pointer">
+          ✕ 結束遊玩
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 bg-black border-x-3 border-b-3 border-[#c89d54] rounded-b-2xl overflow-hidden relative">
+      <iframe id="quest-game-frame" src="" class="w-full h-full border-0" allow="fullscreen"></iframe>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 2：中央吧檯 -> 自由任務（科目 + 單元下拉選單 + 指定資源）
+       ========================================================= -->
+  <div id="modal-free" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-2xl w-full p-5 md:p-6 rounded-2xl max-h-[92vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-3">
+        <div>
+          <h2 class="text-xl font-black text-amber-300">🍻 自由任務：酒館吧檯快問快答</h2>
+          <p class="text-xs text-amber-200/80 mt-0.5">無限刷題補資源！每答對 1 題獲得 <b>2～5 點</b>指定資源，並推進牧場孵蛋進度！</p>
+        </div>
+        <button onclick="closeModal('modal-free')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 狀態列：連勝 + 藥水Buff + 寵物加成 -->
+      <div class="bg-black/50 border border-amber-700/60 rounded-xl px-3.5 py-2 mb-3 flex flex-wrap justify-between items-center gap-2 text-xs">
+        <div class="flex gap-3 font-bold">
+          <span>🔥 當前連勝：<b id="free-streak" class="text-amber-300">0</b> 題</span>
+          <span>🧪 雙倍藥水：<b id="free-double" class="text-purple-300">0</b> 題</span>
+          <span>🛡️ 連勝護盾：<b id="free-shield" class="text-sky-300">0</b> 次</span>
+        </div>
+        <div id="free-pet-buff" class="text-emerald-300 font-bold">🐾 出戰寵物：無</div>
+      </div>
+
+      <!-- 選擇科目、單元下拉選單、報酬資源 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3">
+        <div class="bg-stone-900/90 border border-amber-800/70 rounded-xl p-2.5 space-y-2">
+          <div>
+            <div class="text-[11px] text-amber-300/80 font-bold mb-1">1. 選擇考科與練習單元：</div>
+            <div id="free-subject-btns" class="flex flex-wrap gap-1.5 mb-1.5"></div>
+          </div>
+          <select id="free-unit-select" onchange="onUnitChange()" class="w-full bg-stone-950 text-amber-200 border border-amber-600 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none">
+            <option value="ALL">📚 全部單元綜合練習</option>
+          </select>
+        </div>
+
+        <div class="bg-stone-900/90 border border-amber-800/70 rounded-xl p-2.5 flex flex-col justify-between">
+          <div>
+            <div class="text-[11px] text-amber-300/80 font-bold mb-1.5">2. 選擇報酬資源（平衡資源用）：</div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button onclick="setRewardTarget('gold')" id="rew-gold" class="py-1.5 rounded-lg text-xs font-black border cursor-pointer bg-amber-500 text-stone-950 border-amber-200">🪙 金幣</button>
+              <button onclick="setRewardTarget('wood')" id="rew-wood" class="py-1.5 rounded-lg text-xs font-black border cursor-pointer bg-stone-800 text-amber-200 border-amber-700">🪵 木材</button>
+              <button onclick="setRewardTarget('stone')" id="rew-stone" class="py-1.5 rounded-lg text-xs font-black border cursor-pointer bg-stone-800 text-amber-200 border-amber-700">🪨 石頭</button>
+            </div>
+          </div>
+          <div class="text-[11px] text-amber-200/70 mt-2 text-right" id="unit-q-count">題庫載入中...</div>
+        </div>
+      </div>
+
+      <!-- 題目與 4 選 1 大按鈕區域 -->
+      <div id="free-quiz-box" class="flex-1 overflow-y-auto"></div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 3：右下方圓桌 -> 冒險戰績與加成總覽
+       ========================================================= -->
+  <div id="modal-stats" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-md w-full p-6 rounded-2xl">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-4">
+        <h2 class="text-xl font-black text-amber-300">📊 冒險者戰績手冊</h2>
+        <button onclick="closeModal('modal-stats')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+      <div id="stats-detail-body" class="space-y-2.5 text-sm"></div>
+    </div>
+  </div>
+
+  <script>
+    const player = getPlayerSession();
+    if (!player) window.location.href = 'index.html';
+
+    // 精準對應 tavern.png 構圖的四大互動熱區
+    const TAVERN_HOTSPOTS = [
+      { id: "exit",     name: "🚪 返回小鎮地圖",           left: 1.5,  top: 48.0, width: 15.0, height: 36.0 },
+      { id: "quests",   name: "📜 每日任務：外部遊戲委託牆", left: 7.0,  top: 13.0, width: 27.0, height: 34.0 },
+      { id: "freemode", name: "🍻 自由任務：吧檯快問快答",   left: 35.0, top: 27.0, width: 36.0, height: 29.0 },
+      { id: "stats",    name: "📊 冒險戰績與加成總覽",       left: 66.0, top: 58.0, width: 31.0, height: 35.0 }
+    ];
+
+    if (!player.stats) player.stats = { solved: 0, correct: 0, streak: 0 };
+    if (!player.stats.potions) player.stats.potions = { doubleReward: 0, streakShield: 0 };
+
+    const tavernLv = Math.min(3, Math.max(1, Number((player.buildings && player.buildings.tavern) || 1)));
+    let currentStreak = 0;
+    let isSaving = false;
+
+    const PET_BUFFS = {
+      p01: { name: '森之史萊姆', type: 'wood', bonus: 0.25, desc: '木材獲得 +25%' },
+      p02: { name: '炎尾小狐',   type: 'gold', bonus: 0.25, desc: '金幣獲得 +25%' },
+      p03: { name: '岩甲小龜',   type: 'shield', bonus: 0.2, desc: '20% 機率抵擋答錯斷連' },
+      p04: { name: '星光幼龍',   type: 'all',  bonus: 0.30, desc: '全資源獲得 +30%' }
+    };
+
+    // 預設備援外部遊戲任務（當試算表 Quests 尚未貼入任何網址時顯示）
+    let QUEST_LIST = [
+      { id: 'q_default_1', title: '畢氏定理方格大冒險', subject: '數學', url: 'https://kakafish1022.github.io/Afar-Triangle/', gold: 50, wood: 35, stone: 25 }
+    ];
+
+    // 預設備援選擇題庫（當試算表 Questions 尚未貼入題目時使用）
+    let QUESTION_BANK = [
+      { subject: '數學', unit: '七上-整數運算', question: '計算 (-4) × (-5) + (-8) 的值為何？', options: { A: '12', B: '-28', C: '28', D: '-12' }, answer: 'A' },
+      { subject: '數學', unit: '七上-一元一次方程式', question: '解一元一次方程式 3x - 7 = 14，則 x = ？', options: { A: '3', B: '7', C: '21', D: '-7' }, answer: 'B' },
+      { subject: '數學', unit: '八上-畢氏定理', question: '若直角三角形兩股長分別為 6 與 8，則斜邊長為何？', options: { A: '10', B: '12', C: '14', D: '48' }, answer: 'A' },
+      { subject: '數學', unit: '七上-一元一次式', question: '化簡 2(3x - 4) - (x - 5) 的結果為何？', options: { A: '5x - 13', B: '5x - 3', C: '7x - 3', D: '5x + 1' }, answer: 'B' },
+      { subject: '英文', unit: '七上-現在進行式', question: 'Look! The students ______ basketball on the playground now.', options: { A: 'play', B: 'plays', C: 'are playing', D: 'played' }, answer: 'C' },
+      { subject: '英文', unit: '七下-現在簡單式', question: 'My brother ______ to school by bike every morning.', options: { A: 'go', B: 'goes', C: 'going', D: 'went' }, answer: 'B' },
+      { subject: '英文', unit: '七下-過去式Be動詞', question: 'There ______ two cute cats under the tree yesterday.', options: { A: 'is', B: 'are', C: 'was', D: 'were' }, answer: 'D' }
+    ];
+
+    async function loadTavernCloudData() {
+      if (!GAS_API_URL) return;
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'getTavernData' })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          if (Array.isArray(data.quests) && data.quests.length > 0) QUEST_LIST = data.quests;
+          if (Array.isArray(data.questions) && data.questions.length > 0) QUESTION_BANK = data.questions;
+        }
+      } catch (e) { /* 網路異常時沿用預設備援題庫 */ }
+    }
+    loadTavernCloudData();
+
+    function showToast(msg) {
+      document.getElementById('toast-box').innerHTML = msg;
+    }
+
+    function refreshHUD() {
+      const seatLabel = player.seatNum || player.seat || '';
+      document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}${seatLabel ? '-' + seatLabel : ''})`;
+      document.getElementById('hud-gold').textContent = player.gold;
+      document.getElementById('hud-wood').textContent = player.wood;
+      document.getElementById('hud-stone').textContent = player.stone;
+      document.getElementById('hud-tavern-lv').textContent = `酒館 Lv.${tavernLv}`;
+    }
+
+    refreshHUD();
+
+    initHotspotLayer('img-tavern', 'tavern-layer', TAVERN_HOTSPOTS, (item) => {
+      if (item.id === 'exit') window.location.href = 'town.html';
+      else if (item.id === 'quests') openQuestsModal();
+      else if (item.id === 'freemode') openFreeModal();
+      else if (item.id === 'stats') openStatsModal();
+    });
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function getActivePetBuff() {
+      const pd = player.stats.petData;
+      if (!pd || !pd.active || !Array.isArray(pd.owned)) return null;
+      const pet = pd.owned.find(p => p.id === pd.active);
+      if (!pet) return null;
+      const info = PET_BUFFS[pet.id];
+      return info ? { ...info, lv: pet.lv } : null;
+    }
+
+    function advanceEggProgress(steps = 1) {
+      const pd = player.stats.petData;
+      if (pd && pd.egg && pd.egg.cur < pd.egg.max) {
+        pd.egg.cur = Math.min(pd.egg.max, pd.egg.cur + steps);
+        return `🥚 孵蛋進度 ${pd.egg.cur}/${pd.egg.max}`;
+      }
+      return '';
+    }
+
+    // =========================================================
+    // 1. 每日任務：外部小遊戲委託牆（每日任選 3 款領賞 + Iframe 嵌入）
+    // =========================================================
+    let selectedQuestSubject = '全部';
+    let activeQuest = null;
+
+    function getDailyQuestState() {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+      const key = `tavern_daily_quests_${player.studentId}_${today}`;
+      try {
+        return JSON.parse(localStorage.getItem(key) || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveDailyQuestClaimed(questId) {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+      const key = `tavern_daily_quests_${player.studentId}_${today}`;
+      const list = getDailyQuestState();
+      if (!list.includes(questId)) list.push(questId);
+      localStorage.setItem(key, JSON.stringify(list));
+    }
+
+    function openQuestsModal() {
+      renderQuestsModal();
+      document.getElementById('modal-quests').classList.remove('hidden');
+    }
+
+    function renderQuestsModal() {
+      const claimedList = getDailyQuestState();
+      const leftQuota = Math.max(0, 3 - claimedList.length);
+      document.getElementById('quest-quota-left').textContent = leftQuota;
+
+      const subjects = ['全部', '數學', '英文'];
+      QUEST_LIST.forEach(q => {
+        if (q.subject && !subjects.includes(q.subject)) subjects.push(q.subject);
+      });
+
+      document.getElementById('quest-subject-tabs').innerHTML = subjects.map(sub => {
+        const active = selectedQuestSubject === sub;
+        return `<button onclick="filterQuestSubject('${sub}')" class="px-3.5 py-1 rounded-full text-xs font-black border cursor-pointer ${active ? 'bg-amber-400 text-stone-950 border-amber-100' : 'bg-stone-800 text-amber-200 border-amber-700'}">${sub}</button>`;
+      }).join('');
+
+      const filtered = selectedQuestSubject === '全部'
+        ? QUEST_LIST
+        : QUEST_LIST.filter(q => q.subject === selectedQuestSubject);
+
+      document.getElementById('quest-grid').innerHTML = filtered.map(q => {
+        const alreadyClaimed = claimedList.includes(q.id);
+        let statusBadge = '';
+        if (alreadyClaimed) {
+          statusBadge = `<span class="text-xs bg-emerald-950 text-emerald-300 border border-emerald-500 px-2 py-0.5 rounded-full font-bold">✔ 今日已領賞</span>`;
+        } else if (leftQuota <= 0) {
+          statusBadge = `<span class="text-xs bg-stone-800 text-stone-400 border border-stone-600 px-2 py-0.5 rounded-full font-bold">自由練習模式</span>`;
+        } else {
+          statusBadge = `<span class="text-xs bg-amber-950 text-amber-300 border border-amber-500 px-2 py-0.5 rounded-full font-bold">🎁 可領每日賞金</span>`;
+        }
+
+        const g = q.gold || 50;
+        const w = q.wood || 35;
+        const s = q.stone || 25;
+
+        return `
+          <div class="bg-stone-900/95 border-2 ${alreadyClaimed ? 'border-emerald-700/70' : 'border-amber-600/80'} rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center gap-2 mb-2">
+                <span class="text-xs bg-sky-950 text-sky-300 border border-sky-600 px-2 py-0.5 rounded font-black">${q.subject}</span>
+                ${statusBadge}
+              </div>
+              <h3 class="font-black text-base text-amber-200 mb-2">🎮 ${q.title}</h3>
+              <div class="text-xs bg-black/50 px-3 py-1.5 rounded-lg text-amber-300 font-bold mb-3">
+                委託賞金：🪙+${g} 🪵+${w} 🪨+${s} 🥚+1
+              </div>
+            </div>
+            <button onclick="launchQuestGame('${q.id}')" class="rpg-btn w-full py-2 rounded-xl text-sm cursor-pointer">
+              🚀 開啟遊戲委託
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterQuestSubject(sub) {
+      selectedQuestSubject = sub;
+      renderQuestsModal();
+    }
+
+    function launchQuestGame(questId) {
+      const q = QUEST_LIST.find(item => item.id === questId);
+      if (!q) return;
+      activeQuest = q;
+
+      document.getElementById('iframe-subject-tag').textContent = q.subject;
+      document.getElementById('iframe-quest-title').textContent = q.title;
+      document.getElementById('quest-game-frame').src = q.url;
+
+      const claimedList = getDailyQuestState();
+      const alreadyClaimed = claimedList.includes(q.id);
+      const leftQuota = Math.max(0, 3 - claimedList.length);
+      const claimBtn = document.getElementById('btn-claim-quest');
+
+      if (alreadyClaimed) {
+        claimBtn.disabled = true;
+        claimBtn.textContent = '✔ 本遊戲今日已領過賞金';
+      } else if (leftQuota <= 0) {
+        claimBtn.disabled = true;
+        claimBtn.textContent = '⏳ 今日 3 次遊戲賞金已領滿';
+      } else {
+        claimBtn.disabled = false;
+        claimBtn.textContent = `🎁 完成挑戰領取賞金 (剩 ${leftQuota} 次)`;
+      }
+
+      document.getElementById('modal-iframe').classList.remove('hidden');
+    }
+
+    function closeGameIframe() {
+      document.getElementById('quest-game-frame').src = '';
+      document.getElementById('modal-iframe').classList.add('hidden');
+      activeQuest = null;
+      renderQuestsModal();
+    }
+
+    async function claimCurrentQuestReward() {
+      if (!activeQuest || isSaving) return;
+      const claimedList = getDailyQuestState();
+      if (claimedList.includes(activeQuest.id) || claimedList.length >= 3) return;
+
+      saveDailyQuestClaimed(activeQuest.id);
+
+      let gainGold = activeQuest.gold || 50;
+      let gainWood = activeQuest.wood || 35;
+      let gainStone = activeQuest.stone || 25;
+
+      const buff = getActivePetBuff();
+      if (buff) {
+        const mult = 1 + buff.bonus;
+        if (buff.type === 'all') {
+          gainGold = Math.round(gainGold * mult);
+          gainWood = Math.round(gainWood * mult);
+          gainStone = Math.round(gainStone * mult);
+        } else if (buff.type === 'gold') gainGold = Math.round(gainGold * mult);
+        else if (buff.type === 'wood') gainWood = Math.round(gainWood * mult);
+      }
+
+      player.gold += gainGold;
+      player.wood += gainWood;
+      player.stone += gainStone;
+      const eggMsg = advanceEggProgress(1);
+
+      savePlayerSession(player);
+      refreshHUD();
+      showToast(`🎉 完成【${activeQuest.title}】每日委託！獲得 🪙+${gainGold} 🪵+${gainWood} 🪨+${gainStone} ${eggMsg}`);
+      closeGameIframe();
+      await syncTavernCloud();
+    }
+
+    // =========================================================
+    // 2. 自由任務：吧檯快問快答（科目 + 單元下拉選單）
+    // =========================================================
+    let freeSubject = '數學';
+    let freeUnit = 'ALL';
+    let rewardTarget = 'gold';
+    let currentFreeQ = null;
+
+    function openFreeModal() {
+      updateFreeStatusUI();
+      renderFreeSubjectAndUnits();
+      loadNextFreeQuestion();
+      document.getElementById('modal-free').classList.remove('hidden');
+    }
+
+    function updateFreeStatusUI() {
+      document.getElementById('free-streak').textContent = currentStreak;
+      document.getElementById('free-double').textContent = player.stats.potions.doubleReward || 0;
+      document.getElementById('free-shield').textContent = player.stats.potions.streakShield || 0;
+      const buff = getActivePetBuff();
+      document.getElementById('free-pet-buff').textContent = buff
+        ? `🐾 ${buff.name} Lv.${buff.lv}（${buff.desc}）`
+        : '🐾 出戰寵物：無';
+    }
+
+    function renderFreeSubjectAndUnits() {
+      const subjects = ['數學', '英文'];
+      QUESTION_BANK.forEach(q => {
+        if (q.subject && !subjects.includes(q.subject)) subjects.push(q.subject);
+      });
+      if (!subjects.includes(freeSubject)) freeSubject = subjects[0];
+
+      document.getElementById('free-subject-btns').innerHTML = subjects.map(sub => {
+        const active = freeSubject === sub;
+        return `<button onclick="setFreeSubject('${sub}')" class="px-3 py-1 rounded-lg text-xs font-black border cursor-pointer ${active ? 'bg-amber-400 text-stone-950 border-amber-100' : 'bg-stone-800 text-amber-200 border-amber-700'}">${sub}</button>`;
+      }).join('');
+
+      const subjectQuestions = QUESTION_BANK.filter(q => q.subject === freeSubject);
+      const units = Array.from(new Set(subjectQuestions.map(q => q.unit || '綜合練習')));
+      if (freeUnit !== 'ALL' && !units.includes(freeUnit)) freeUnit = 'ALL';
+
+      const selectEl = document.getElementById('free-unit-select');
+      selectEl.innerHTML = `<option value="ALL">📚 全部【${freeSubject}】單元（共 ${subjectQuestions.length} 題）</option>` +
+        units.map(u => {
+          const cnt = subjectQuestions.filter(q => (q.unit || '綜合練習') === u).length;
+          return `<option value="${u}" ${freeUnit === u ? 'selected' : ''}>📖 ${u}（${cnt} 題）</option>`;
+        }).join('');
+    }
+
+    function setFreeSubject(sub) {
+      freeSubject = sub;
+      freeUnit = 'ALL';
+      renderFreeSubjectAndUnits();
+      loadNextFreeQuestion();
+    }
+
+    function onUnitChange() {
+      freeUnit = document.getElementById('free-unit-select').value;
+      loadNextFreeQuestion();
+    }
+
+    function setRewardTarget(target) {
+      rewardTarget = target;
+      ['gold', 'wood', 'stone'].forEach(t => {
+        const btn = document.getElementById('rew-' + t);
+        if (t === target) {
+          btn.className = 'py-1.5 rounded-lg text-xs font-black border cursor-pointer bg-amber-500 text-stone-950 border-amber-200';
+        } else {
+          btn.className = 'py-1.5 rounded-lg text-xs font-black border cursor-pointer bg-stone-800 text-amber-200 border-amber-700';
+        }
+      });
+    }
+
+    function loadNextFreeQuestion() {
+      let pool = QUESTION_BANK.filter(q => q.subject === freeSubject);
+      if (freeUnit !== 'ALL') {
+        pool = pool.filter(q => (q.unit || '綜合練習') === freeUnit);
+      }
+      const list = pool.length > 0 ? pool : QUESTION_BANK;
+      document.getElementById('unit-q-count').textContent = `目前題池：${list.length} 題`;
+      currentFreeQ = list[Math.floor(Math.random() * list.length)];
+
+      const box = document.getElementById('free-quiz-box');
+      box.innerHTML = `
+        <div class="bg-stone-900/95 border border-amber-600/70 rounded-xl p-4 mb-3 text-sm md:text-base font-bold leading-relaxed text-amber-100">
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            <span class="text-xs bg-amber-900 text-amber-200 px-2 py-0.5 rounded">${currentFreeQ.subject}</span>
+            <span class="text-xs bg-sky-950 text-sky-300 border border-sky-700 px-2 py-0.5 rounded">${currentFreeQ.unit || '綜合練習'}</span>
+          </div>
+          <div>${currentFreeQ.question}</div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          ${['A', 'B', 'C', 'D'].map(key => `
+            <button onclick="answerFreeQuestion('${key}')" class="rpg-btn py-3 px-4 rounded-xl text-left text-sm md:text-base cursor-pointer flex items-center gap-2.5 shadow">
+              <span class="bg-stone-900 text-amber-300 w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0">${key}</span>
+              <span>${currentFreeQ.options[key] || ''}</span>
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    async function answerFreeQuestion(choice) {
+      if (!currentFreeQ) return;
+      player.stats.solved = (player.stats.solved || 0) + 1;
+      const isCorrect = (choice === currentFreeQ.answer);
+
+      if (isCorrect) {
+        player.stats.correct = (player.stats.correct || 0) + 1;
+        currentStreak += 1;
+        if (currentStreak > (player.stats.streak || 0)) {
+          player.stats.streak = currentStreak;
+        }
+
+        let pts = Math.floor(Math.random() * 4) + 2; // 2 ~ 5
+        if (tavernLv >= 2 && currentStreak >= 5) pts += 1;
+
+        let extraNotes = [];
+        if ((player.stats.potions.doubleReward || 0) > 0) {
+          pts *= 2;
+          player.stats.potions.doubleReward -= 1;
+          extraNotes.push('🧪雙倍藥水×2');
+        }
+
+        const buff = getActivePetBuff();
+        if (buff && (buff.type === 'all' || buff.type === rewardTarget)) {
+          pts = Math.ceil(pts * (1 + buff.bonus));
+          extraNotes.push(`🐾${buff.name}加成`);
+        }
+
+        const iconMap = { gold: '🪙', wood: '🪵', stone: '🪨' };
+        player[rewardTarget] += pts;
+        const eggMsg = advanceEggProgress(1);
+        if (eggMsg) extraNotes.push(eggMsg);
+
+        showToast(`✅ 答對了！獲得 ${iconMap[rewardTarget]} +${pts}（連勝 ${currentStreak} 題）${extraNotes.length ? '｜' + extraNotes.join(' ') : ''}`);
+      } else {
+        let shielded = false;
+        if ((player.stats.potions.streakShield || 0) > 0) {
+          player.stats.potions.streakShield -= 1;
+          shielded = true;
+          showToast(`🛡️ 答錯了（正解為 ${currentFreeQ.answer}），但消耗 1 次【連勝守護藥水】成功保住 ${currentStreak} 連勝！`);
+        } else {
+          const buff = getActivePetBuff();
+          if (buff && buff.type === 'shield' && Math.random() < buff.bonus) {
+            shielded = true;
+            showToast(`🐢 答錯了（正解為 ${currentFreeQ.answer}），但【岩甲小龜】發動護盾保住了 ${currentStreak} 連勝！`);
+          }
+        }
+
+        if (!shielded) {
+          currentStreak = 0;
+          showToast(`❌ 答錯囉！正確答案是 (${currentFreeQ.answer})，連勝歸零，再接再厲！`);
+        }
+      }
+
+      savePlayerSession(player);
+      refreshHUD();
+      updateFreeStatusUI();
+      loadNextFreeQuestion();
+
+      if (player.stats.solved % 3 === 0) {
+        syncTavernCloud();
+      }
+    }
+
+    // =========================================================
+    // 3. 冒險戰績總覽
+    // =========================================================
+    function openStatsModal() {
+      const solved = player.stats.solved || 0;
+      const correct = player.stats.correct || 0;
+      const rate = solved > 0 ? Math.round((correct / solved) * 100) : 0;
+      const buff = getActivePetBuff();
+
+      document.getElementById('stats-detail-body').innerHTML = `
+        <div class="bg-stone-900 border border-amber-700/70 rounded-xl p-3 flex justify-between">
+          <span>📚 累計作答 / 答對題數</span>
+          <b class="text-amber-300">${solved} 題 / ${correct} 題（正確率 ${rate}%）</b>
+        </div>
+        <div class="bg-stone-900 border border-amber-700/70 rounded-xl p-3 flex justify-between">
+          <span>🔥 歷史最高連勝紀錄</span>
+          <b class="text-orange-400">${player.stats.streak || 0} 連勝</b>
+        </div>
+        <div class="bg-stone-900 border border-amber-700/70 rounded-xl p-3 flex justify-between">
+          <span>🧪 背包藥水存量</span>
+          <b class="text-purple-300">雙倍賞金 ${player.stats.potions.doubleReward || 0} 題｜護盾 ${player.stats.potions.streakShield || 0} 次</b>
+        </div>
+        <div class="bg-stone-900 border border-amber-700/70 rounded-xl p-3 flex justify-between">
+          <span>🐾 當前隨身出戰寵物</span>
+          <b class="text-emerald-300">${buff ? `${buff.name} Lv.${buff.lv}（${buff.desc}）` : '尚未設定'}</b>
+        </div>
+      `;
+      document.getElementById('modal-stats').classList.remove('hidden');
+    }
+
+    async function syncTavernCloud() {
+      if (isSaving || !GAS_API_URL) return;
+      isSaving = true;
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'saveProgress', player })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && Array.isArray(data.leaderboard)) {
+          sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard));
+        }
+      } catch (err) {
+        console.error('酒館雲端存檔失敗：', err);
+      } finally {
+        isSaving = false;
+      }
+    }
+
+    window.addEventListener('beforeunload', () => {
+      if (GAS_API_URL && navigator.sendBeacon) {
+        navigator.sendBeacon(GAS_API_URL, JSON.stringify({ action: 'saveProgress', player }));
+      }
+    });
+  </script>
+</body>
+</html>

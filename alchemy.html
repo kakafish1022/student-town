@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>數學奇幻小鎮 - 魔法煉金室</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+  <style>
+    body {
+      background: #120d0a;
+      color: #f3e5ab;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+      user-select: none;
+    }
+
+    .rpg-panel {
+      background: linear-gradient(145deg, #2b1d14, #1c120c);
+      border: 3px solid #c89d54;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.9);
+    }
+
+    .rpg-btn {
+      background: linear-gradient(180deg, #e5b567, #b88232);
+      border: 2px solid #fff2cc;
+      color: #231409;
+      font-weight: 900;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .rpg-btn:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: scale(1.02);
+    }
+
+    .rpg-btn:disabled {
+      background: #3f3226;
+      border-color: #6b5642;
+      color: #8c7662;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* 場景熱區樣式 */
+    .hotspot {
+      position: absolute;
+      cursor: pointer;
+      border-radius: 16px;
+      transition: background 0.2s, box-shadow 0.2s;
+      z-index: 15;
+    }
+
+    .hotspot:hover {
+      background: rgba(192, 132, 252, 0.2);
+      box-shadow: 0 0 24px rgba(192, 132, 252, 0.65);
+    }
+
+    .hotspot-label {
+      position: absolute;
+      top: 6%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.95);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8);
+    }
+
+    .hotspot:hover .hotspot-label {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    .loading-toast {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.95);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 14px;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+      max-width: 92vw;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex items-center justify-center relative">
+  <!-- 滿版魔法煉金室底圖 -->
+  <img id="img-alchemy" src="alchemy.png" alt="魔法煉金室" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <div id="alchemy-layer" class="absolute"></div>
+
+  <!-- 左上角返回按鈕 -->
+  <div class="absolute top-3 left-3 z-20">
+    <button onclick="window.location.href='town.html'" class="rpg-btn px-4 py-2 rounded-xl text-sm shadow-lg cursor-pointer flex items-center gap-1.5">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
+
+  <!-- 右上角玩家資源與煉金室等級 -->
+  <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-3 md:gap-4 text-xs md:text-sm">
+      <span class="text-amber-400 font-black" id="hud-name">勇者</span>
+      <span>🪙 <b id="hud-gold">0</b></span>
+      <span>🪵 <b id="hud-wood">0</b></span>
+      <span>🪨 <b id="hud-stone">0</b></span>
+      <span class="text-xs bg-purple-950 px-2.5 py-0.5 rounded-full border border-purple-400 text-purple-200" id="hud-alchemy-lv">煉金室 Lv.1</span>
+    </div>
+  </div>
+
+  <!-- 底部操作提示 -->
+  <div id="toast-box" class="loading-toast">
+    ⚗️ 點擊後方【藥水架】購買增益商城道具、中央【煉金大釜】調配免費魔藥、右側【寶箱星象儀】切換頭銜與盲盒！
+  </div>
+
+  <!-- =========================================================
+       彈窗 1：後方藥水架 -> 奇幻魔藥與道具商城（純點擊購買）
+       ========================================================= -->
+  <div id="modal-shop" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-4xl w-full p-5 md:p-6 rounded-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-3">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">🧪 奇幻魔藥與冒險商城</h2>
+          <p class="text-xs text-amber-200/80 mt-0.5">購買增益藥水後，前往【冒險者酒館】解題會自動生效！升級煉金室可解鎖高階商品。</p>
+        </div>
+        <button onclick="closeModal('modal-shop')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 背包藥水庫存與現有資源條 -->
+      <div class="bg-black/50 border border-purple-500/50 rounded-xl px-4 py-2.5 mb-3 flex flex-wrap justify-between items-center gap-2 text-xs md:text-sm">
+        <div class="flex flex-wrap gap-3 text-purple-200 font-bold">
+          <span>🎒 背包庫存：</span>
+          <span>🧪 雙倍賞金：<b id="inv-double" class="text-amber-300">0</b> 題份</span>
+          <span>🛡️ 連勝護盾：<b id="inv-shield" class="text-sky-300">0</b> 次</span>
+        </div>
+        <div class="flex gap-3 font-black">
+          <span>🪙 <b id="shop-gold" class="text-amber-300">0</b></span>
+          <span>🪵 <b id="shop-wood" class="text-emerald-300">0</b></span>
+          <span>🪨 <b id="shop-stone" class="text-sky-300">0</b></span>
+        </div>
+      </div>
+
+      <!-- 商品貨架 -->
+      <div id="shop-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto pr-1 flex-1">
+        <!-- JS 動態生成商品 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 2：中央煉金大釜 -> 4 選 1 比例濃度魔藥試煉（零打字）
+       ========================================================= -->
+  <div id="modal-cauldron" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-xl w-full p-6 rounded-2xl">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-4">
+        <div>
+          <h2 class="text-xl font-black text-amber-300">⚗️ 比例魔藥調配試煉</h2>
+          <p class="text-xs text-amber-200/80 mt-0.5">算對配方比例即可免費獲得隨機藥水！（今日剩餘免費次數：<b id="trial-left" class="text-emerald-300">3</b> 次）</p>
+        </div>
+        <button onclick="closeModal('modal-cauldron')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <div id="cauldron-quiz-area">
+        <!-- JS 動態生成 4 選 1 比例題目與大顆觸控選項 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 3：右側寶箱星象儀 -> 榮耀頭銜櫃（試算表同步）＆ 賢者盲盒
+       ========================================================= -->
+  <div id="modal-titles" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-4xl w-full p-5 md:p-6 rounded-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-3">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">👑 榮耀頭銜櫃 & 賢者盲盒</h2>
+          <p class="text-xs text-amber-200/85 mt-0.5">
+            目前佩戴招牌頭銜：<span id="cur-equipped-badge" class="bg-amber-400 text-stone-950 font-black px-2.5 py-0.5 rounded-full ml-1">初出茅廬</span>（將展示於全班英雄榜！）
+          </p>
+        </div>
+        <button onclick="closeModal('modal-titles')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 賢者之石盲盒區塊 -->
+      <div class="bg-gradient-to-r from-purple-950/90 to-indigo-950/90 border-2 border-purple-400/70 rounded-xl p-3.5 mb-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="text-4xl">🔮</div>
+          <div>
+            <div class="font-black text-base text-purple-200">賢者之石神秘盲盒（需煉金室 Lv.2，已抽 <b id="gacha-count" class="text-amber-300">0</b> 次）</div>
+            <div class="text-xs text-purple-200/80">投入 🪙30 🪵20 🪨20，隨機爆出雙倍藥水、寵物經驗或大額金幣！</div>
+          </div>
+        </div>
+        <button id="btn-gacha" onclick="pullGacha()" class="rpg-btn px-5 py-2.5 rounded-xl text-xs md:text-sm cursor-pointer shrink-0">
+          ✨ 啟動煉成陣
+        </button>
+      </div>
+
+      <!-- 雙軌頭銜列表（成就免費領取 + 商城購買 + 一鍵佩戴） -->
+      <div class="text-sm font-black text-amber-300 mb-2">🏅 冒險者頭銜收藏櫃（點擊即可佩戴或解鎖）：</div>
+      <div id="title-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 overflow-y-auto pr-1 flex-1">
+        <!-- JS 動態生成頭銜卡片 -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const player = getPlayerSession();
+    if (!player) window.location.href = 'index.html';
+
+    // 精準對應 alchemy.png 構圖的四大互動熱區
+    const ALCHEMY_HOTSPOTS = [
+      { id: "exit",         name: "🚪 返回小鎮地圖",         left: 2.0,  top: 23.0, width: 17.0, height: 42.0 },
+      { id: "shop",         name: "🧪 奇幻魔藥與道具商城",   left: 23.0, top: 8.0,  width: 35.0, height: 32.0 },
+      { id: "cauldron",     name: "⚗️ 比例魔藥調配試煉",     left: 38.0, top: 38.0, width: 25.0, height: 34.0 },
+      { id: "titles_gacha", name: "👑 榮耀頭銜櫃 & 賢者盲盒", left: 68.0, top: 24.0, width: 30.0, height: 42.0 }
+    ];
+
+    // 初始化 player.stats 擴充欄位
+    if (!player.stats) player.stats = { solved: 0, correct: 0, streak: 0 };
+    if (!player.stats.potions) {
+      player.stats.potions = { doubleReward: 0, streakShield: 0 };
+    }
+    if (!Array.isArray(player.stats.titles)) {
+      player.stats.titles = ['初出茅廬'];
+    }
+    if (!player.stats.equippedTitle) {
+      player.stats.equippedTitle = '初出茅廬';
+    }
+    if (typeof player.stats.gachaCount !== 'number') {
+      player.stats.gachaCount = 0;
+    }
+
+    const alchemyLv = Math.min(3, Math.max(1, Number((player.buildings && player.buildings.alchemy) || 1)));
+    let isSaving = false;
+
+    // =========================================================
+    // 商城道具目錄（全點擊購買，無需打字）
+    // =========================================================
+    const SHOP_ITEMS = [
+      {
+        id: 'pot_double',
+        icon: '🧪',
+        name: '雙倍賞金藥水 (3題份)',
+        minLv: 1,
+        cost: { gold: 30, wood: 15, stone: 0 },
+        desc: '在冒險者酒館答對題目時，接下來 3 題獲得的金/木/石獎勵全部 ×2！'
+      },
+      {
+        id: 'pot_fast_egg',
+        icon: '⚡',
+        name: '急速孵化藥水 (+2進度)',
+        minLv: 1,
+        cost: { gold: 25, wood: 20, stone: 10 },
+        desc: '立即為牧場草巢中的神秘蛋注入能量，直接推進 +2 題孵化進度！'
+      },
+      {
+        id: 'pet_candy',
+        icon: '🍬',
+        name: '彩虹親密糖果 (+40經驗)',
+        minLv: 1,
+        cost: { gold: 45, wood: 0, stone: 0 },
+        desc: '直接餵食給目前的「隨身出戰寵物」，大幅增加 40 點親密成長經驗！'
+      },
+      {
+        id: 'pot_shield',
+        icon: '🛡️',
+        name: '連勝守護藥水 (+1護盾)',
+        minLv: 2,
+        cost: { gold: 40, wood: 0, stone: 20 },
+        desc: '【需煉金室 Lv.2】在酒館答錯題目時自動抵擋一次懲罰，保護連勝不斷線！'
+      },
+      {
+        id: 'res_pack',
+        icon: '📦',
+        name: '矮人建築材料補給箱',
+        minLv: 2,
+        cost: { gold: 60, wood: 0, stone: 0 },
+        desc: '【需煉金室 Lv.2】用純金幣向商隊採購建材，立即獲得 🪵+40 與 🪨+40！'
+      },
+      {
+        id: 'pet_evolve_gem',
+        icon: '💎',
+        name: '覺醒進化結晶 (直升1階)',
+        minLv: 3,
+        cost: { gold: 150, wood: 50, stone: 50 },
+        desc: '【需煉金室 Lv.3】傳說煉金秘寶！讓目前出戰的 Lv.1 或 Lv.2 寵物直接進化一階！'
+      }
+    ];
+
+    // =========================================================
+    // 預設備援頭銜清單（同步試算表 Titles 分頁，無表單時自動備援）
+    // =========================================================
+    const DEFAULT_TITLES = [
+      { id: '初出茅廬',     icon: '🏆', type: 'achievement', condType: 'default',  condValue: 0,   cost: { gold: 0, wood: 0, stone: 0 } },
+      { id: '連勝破軍',     icon: '🏆', type: 'achievement', condType: 'streak',   condValue: 10,  cost: { gold: 0, wood: 0, stone: 0 } },
+      { id: '百題斬勇者',   icon: '🏆', type: 'achievement', condType: 'correct',  condValue: 100, cost: { gold: 0, wood: 0, stone: 0 } },
+      { id: '神獸馴服師',   icon: '🏆', type: 'achievement', condType: 'pet_lv3',  condValue: 1,   cost: { gold: 0, wood: 0, stone: 0 } },
+      { id: '黃金水晶領主', icon: '🏆', type: 'achievement', condType: 'town_lv3', condValue: 1,   cost: { gold: 0, wood: 0, stone: 0 } },
+      { id: '歐皇轉世',     icon: '🏆', type: 'achievement', condType: 'gacha',    condValue: 10,  cost: { gold: 0, wood: 0, stone: 0 } },
+      { id: '心算小神童',   icon: '🎖️', type: 'shop',        condType: 'none',     condValue: 0,   cost: { gold: 80, wood: 0, stone: 0 } },
+      { id: '小鎮大富翁',   icon: '🎖️', type: 'shop',        condType: 'none',     condValue: 0,   cost: { gold: 250, wood: 0, stone: 0 } },
+      { id: '大魔導煉金師', icon: '🎖️', type: 'shop',        condType: 'none',     condValue: 0,   cost: { gold: 150, wood: 80, stone: 80 } }
+    ];
+
+    let TITLE_CATALOG = JSON.parse(sessionStorage.getItem('math_town_titles') || 'null') || DEFAULT_TITLES;
+
+    function showToast(msg) {
+      document.getElementById('toast-box').innerHTML = msg;
+    }
+
+    function refreshHUD() {
+      const seatLabel = player.seatNum || player.seat || '';
+      document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}${seatLabel ? '-' + seatLabel : ''})`;
+      document.getElementById('hud-gold').textContent = player.gold;
+      document.getElementById('hud-wood').textContent = player.wood;
+      document.getElementById('hud-stone').textContent = player.stone;
+      document.getElementById('hud-alchemy-lv').textContent = `煉金室 Lv.${alchemyLv}`;
+    }
+
+    refreshHUD();
+
+    initHotspotLayer('img-alchemy', 'alchemy-layer', ALCHEMY_HOTSPOTS, (item) => {
+      if (item.id === 'exit') {
+        window.location.href = 'town.html';
+      } else if (item.id === 'shop') {
+        openShopModal();
+      } else if (item.id === 'cauldron') {
+        openCauldronModal();
+      } else if (item.id === 'titles_gacha') {
+        openTitlesModal();
+      }
+    });
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // =========================================================
+    // 1. 奇幻魔藥與道具商城（純點擊購買）
+    // =========================================================
+    function openShopModal() {
+      renderShop();
+      document.getElementById('modal-shop').classList.remove('hidden');
+    }
+
+    function renderShop() {
+      document.getElementById('inv-double').textContent = player.stats.potions.doubleReward || 0;
+      document.getElementById('inv-shield').textContent = player.stats.potions.streakShield || 0;
+      document.getElementById('shop-gold').textContent = player.gold;
+      document.getElementById('shop-wood').textContent = player.wood;
+      document.getElementById('shop-stone').textContent = player.stone;
+
+      const grid = document.getElementById('shop-grid');
+      grid.innerHTML = SHOP_ITEMS.map(item => {
+        const locked = alchemyLv < item.minLv;
+        const canAfford = player.gold >= item.cost.gold && player.wood >= item.cost.wood && player.stone >= item.cost.stone;
+        const disabled = locked || !canAfford || isSaving;
+
+        const costParts = [];
+        if (item.cost.gold > 0) costParts.push(`🪙 ${item.cost.gold}`);
+        if (item.cost.wood > 0) costParts.push(`🪵 ${item.cost.wood}`);
+        if (item.cost.stone > 0) costParts.push(`🪨 ${item.cost.stone}`);
+
+        let btnText = '🛒 一鍵購買';
+        if (locked) btnText = `🔒 需煉金室 Lv.${item.minLv}`;
+        else if (!canAfford) btnText = '資源不足';
+        else if (isSaving) btnText = '⏳ 處理中...';
+
+        return `
+          <div class="bg-stone-900/95 border-2 ${locked ? 'border-stone-700 opacity-75' : 'border-purple-600/70'} rounded-xl p-3.5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-1.5">
+                <span class="text-2xl">${item.icon}</span>
+                <span class="font-black text-sm text-amber-200">${item.name}</span>
+              </div>
+              <p class="text-xs text-amber-100/80 leading-relaxed mb-3">${item.desc}</p>
+            </div>
+            <div>
+              <div class="text-xs font-black bg-black/50 px-3 py-1.5 rounded-lg mb-2 flex justify-center gap-3 text-amber-300">
+                ${costParts.join(' ')}
+              </div>
+              <button onclick="buyShopItem('${item.id}')" ${disabled ? 'disabled' : ''} class="rpg-btn w-full py-1.5 rounded-lg text-xs cursor-pointer">
+                ${btnText}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function buyShopItem(itemId) {
+      if (isSaving) return;
+      const item = SHOP_ITEMS.find(i => i.id === itemId);
+      if (!item || alchemyLv < item.minLv) return;
+      if (player.gold < item.cost.gold || player.wood < item.cost.wood || player.stone < item.cost.stone) {
+        return showToast('⚠️ 資源不足，無法購買此道具！');
+      }
+
+      const petData = player.stats.petData;
+      if (itemId === 'pot_fast_egg' && (!petData || !petData.egg)) {
+        return showToast('⚠️ 目前牧場草巢裡沒有正在孵化的蛋喔！請先去牧場領養蛋。');
+      }
+      if (itemId === 'pet_candy' || itemId === 'pet_evolve_gem') {
+        if (!petData || !petData.active || !Array.isArray(petData.owned)) {
+          return showToast('⚠️ 你目前還沒有設定「隨身出戰寵物」喔！請先去牧場設定。');
+        }
+        const activePet = petData.owned.find(p => p.id === petData.active);
+        if (!activePet || activePet.lv >= 3) {
+          return showToast('⚠️ 目前出戰的寵物已經達到最高 Lv.3 究極體，不需要再餵食囉！');
+        }
+      }
+
+      player.gold -= item.cost.gold;
+      player.wood -= item.cost.wood;
+      player.stone -= item.cost.stone;
+
+      let toastMsg = `✨ 成功購買【${item.name}】！`;
+
+      if (itemId === 'pot_double') {
+        player.stats.potions.doubleReward = (player.stats.potions.doubleReward || 0) + 3;
+        toastMsg = '🧪 已獲得【雙倍賞金藥水】，接下來在酒館答對 3 題獎勵全部翻倍！';
+      } else if (itemId === 'pot_shield') {
+        player.stats.potions.streakShield = (player.stats.potions.streakShield || 0) + 1;
+        toastMsg = '🛡️ 已獲得【連勝守護藥水】，將在你答錯時自動抵擋一次斷連懲罰！';
+      } else if (itemId === 'res_pack') {
+        player.wood += 40;
+        player.stone += 40;
+        toastMsg = '📦 拆開矮人補給箱，獲得 🪵+40 與 🪨+40！';
+      } else if (itemId === 'pot_fast_egg') {
+        petData.egg.cur = Math.min(petData.egg.max, petData.egg.cur + 2);
+        toastMsg = `⚡ 急速孵化藥水生效！神秘蛋孵化進度推進至 ${petData.egg.cur} / ${petData.egg.max}！`;
+      } else if (itemId === 'pet_candy') {
+        const activePet = petData.owned.find(p => p.id === petData.active);
+        activePet.exp += 40;
+        const needExp = activePet.lv * 50;
+        if (activePet.lv < 3 && activePet.exp >= needExp) {
+          activePet.exp -= needExp;
+          activePet.lv += 1;
+          toastMsg = `🎊 吃下彩虹糖果後，出戰寵物成功進化為 Lv.${activePet.lv} 啦！`;
+        } else {
+          toastMsg = `🍬 出戰寵物開心地吃下彩虹糖果，親密經驗 +40！`;
+        }
+      } else if (itemId === 'pet_evolve_gem') {
+        const activePet = petData.owned.find(p => p.id === petData.active);
+        activePet.lv = Math.min(3, activePet.lv + 1);
+        activePet.exp = 0;
+        toastMsg = `💎 覺醒進化結晶閃耀光芒！出戰寵物直接覺醒進化為 Lv.${activePet.lv}！`;
+      }
+
+      savePlayerSession(player);
+      refreshHUD();
+      renderShop();
+      showToast(toastMsg);
+      await syncAlchemyCloud();
+    }
+
+    // =========================================================
+    // 2. 中央煉金大釜 -> 4 選 1 比例濃度試煉（零打字）
+    // =========================================================
+    function getTodayTrialCount() {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+      const key = `alchemy_trial_${player.studentId}_${today}`;
+      return Number(sessionStorage.getItem(key) || 0);
+    }
+
+    function addTodayTrialCount() {
+      const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+      const key = `alchemy_trial_${player.studentId}_${today}`;
+      sessionStorage.setItem(key, String(getTodayTrialCount() + 1));
+    }
+
+    function generateRatioQuestion() {
+      const baseA = Math.floor(Math.random() * 4) + 2; // 2~5
+      const baseB = Math.floor(Math.random() * 5) + 3; // 3~7
+      const mult = Math.floor(Math.random() * 4) + 3;  // 3~6
+      const ans = baseB * mult;
+      const qText = `煉金配方中，「星光草汁」與「山泉水」的比例為 ${baseA} ： ${baseB}。若鍋中倒入了 ${baseA * mult} 毫升的星光草汁，請問需要加入多少毫升的山泉水？`;
+
+      const distractors = new Set([ans]);
+      while (distractors.size < 4) {
+        const offset = (Math.floor(Math.random() * 5) - 2) * baseB + (Math.floor(Math.random() * 5) - 2);
+        const cand = ans + offset;
+        if (cand > 0 && cand !== ans) distractors.add(cand);
+      }
+      const options = Array.from(distractors).sort(() => Math.random() - 0.5);
+      return { qText, ans, options };
+    }
+
+    let currentTrialQ = null;
+
+    function openCauldronModal() {
+      const used = getTodayTrialCount();
+      const left = Math.max(0, 3 - used);
+      document.getElementById('trial-left').textContent = left;
+
+      const area = document.getElementById('cauldron-quiz-area');
+      if (left <= 0) {
+        area.innerHTML = `
+          <div class="text-center py-6">
+            <div class="text-4xl mb-2">⏳</div>
+            <div class="text-base font-black text-amber-300">今日 3 次免費魔藥試煉已全數完成！</div>
+            <div class="text-xs text-amber-200/75 mt-1">煉金大釜需要冷卻休息，明天再來挑戰吧！</div>
+          </div>
+        `;
+      } else {
+        currentTrialQ = generateRatioQuestion();
+        area.innerHTML = `
+          <div class="bg-stone-900/95 border border-purple-500/60 rounded-xl p-4 mb-4 text-sm md:text-base font-bold leading-relaxed text-amber-100">
+            📜 配方難題：${currentTrialQ.qText}
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            ${currentTrialQ.options.map(opt => `
+              <button onclick="submitRatioAnswer(${opt})" class="rpg-btn py-3.5 rounded-xl text-base md:text-lg cursor-pointer shadow">
+                ${opt} 毫升
+              </button>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      document.getElementById('modal-cauldron').classList.remove('hidden');
+    }
+
+    async function submitRatioAnswer(selected) {
+      if (!currentTrialQ || isSaving) return;
+      addTodayTrialCount();
+      const isCorrect = (selected === currentTrialQ.ans);
+      currentTrialQ = null;
+
+      if (isCorrect) {
+        const rewardDouble = Math.random() < 0.6;
+        if (rewardDouble) {
+          player.stats.potions.doubleReward = (player.stats.potions.doubleReward || 0) + 1;
+          showToast('🎉 比例計算完全精準！大釜煉出了 1 題份【🧪 雙倍賞金藥水】！');
+        } else {
+          player.stats.potions.streakShield = (player.stats.potions.streakShield || 0) + 1;
+          showToast('🎉 比例計算完全精準！大釜煉出了 1 次【🛡️ 連勝守護藥水】！');
+        }
+        savePlayerSession(player);
+        await syncAlchemyCloud();
+      } else {
+        showToast('💥 比例調配失誤，鍋子冒出一陣黑煙！（今日試煉次數 -1）');
+      }
+
+      openCauldronModal();
+    }
+
+    // =========================================================
+    // 3. 榮耀頭銜櫃（試算表 Titles 分頁動態同步）＆ 賢者盲盒
+    // =========================================================
+    function checkTitleCondition(t) {
+      const val = Number(t.condValue) || 0;
+      const petData = player.stats.petData || { owned: [] };
+      switch (t.condType) {
+        case 'default':   return true;
+        case 'streak':    return (player.stats.streak || 0) >= val;
+        case 'correct':   return (player.stats.correct || 0) >= val;
+        case 'solved':    return (player.stats.solved || 0) >= val;
+        case 'pet_lv3':   return (petData.owned || []).filter(p => p.lv >= 3).length >= val;
+        case 'pet_count': return (petData.owned || []).length >= val;
+        case 'town_lv3':  return player.buildings && Math.min(...Object.values(player.buildings)) >= 3;
+        case 'gacha':     return (player.stats.gachaCount || 0) >= val;
+        default:          return false;
+      }
+    }
+
+    function formatTitleDesc(t) {
+      if (t.type === 'shop') {
+        const parts = [];
+        if (t.cost.gold > 0) parts.push(`🪙${t.cost.gold}`);
+        if (t.cost.wood > 0) parts.push(`🪵${t.cost.wood}`);
+        if (t.cost.stone > 0) parts.push(`🪨${t.cost.stone}`);
+        return `商城兌換：${parts.join(' ') || '免費'}`;
+      }
+      const val = Number(t.condValue) || 0;
+      const map = {
+        default:   '新手預設頭銜',
+        streak:    `酒館最高連勝達 ${val} 題`,
+        correct:   `累計答對數學題達 ${val} 題`,
+        solved:    `累計作答總題數達 ${val} 題`,
+        pet_lv3:   `牧場擁有 ${val} 隻 Lv.3 究極體寵物`,
+        pet_count: `寵物圖鑑收集達 ${val} 隻`,
+        town_lv3:  '全鎮 6 棟建築皆升至 Lv.3',
+        gacha:     `賢者盲盒累計煉成 ${val} 次`
+      };
+      return map[t.condType] || '達成特定冒險里程碑';
+    }
+
+    async function openTitlesModal() {
+      renderTitlesAndGacha();
+      document.getElementById('modal-titles').classList.remove('hidden');
+
+      // 背景向 GAS 抓取最新 Titles 表單設定
+      if (GAS_API_URL) {
+        try {
+          const res = await fetch(GAS_API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getTitles' })
+          });
+          const data = await res.json();
+          if (data.status === 'success' && Array.isArray(data.titles) && data.titles.length > 0) {
+            TITLE_CATALOG = data.titles;
+            sessionStorage.setItem('math_town_titles', JSON.stringify(TITLE_CATALOG));
+          }
+        } catch (e) { /* 網路異常時沿用快取 */ }
+      }
+
+      // 檢查成就型頭銜是否達成條件
+      let newlyUnlocked = [];
+      TITLE_CATALOG.forEach(t => {
+        if (t.type === 'achievement' && !player.stats.titles.includes(t.id) && checkTitleCondition(t)) {
+          player.stats.titles.push(t.id);
+          newlyUnlocked.push(t.id);
+        }
+      });
+      if (newlyUnlocked.length > 0) {
+        savePlayerSession(player);
+        showToast(`🎊 恭喜達成里程碑，自動解鎖新頭銜：【${newlyUnlocked.join('、')}】！`);
+        syncAlchemyCloud();
+      }
+
+      renderTitlesAndGacha();
+    }
+
+    function renderTitlesAndGacha() {
+      document.getElementById('cur-equipped-badge').textContent = player.stats.equippedTitle || '初出茅廬';
+      document.getElementById('gacha-count').textContent = player.stats.gachaCount || 0;
+
+      const gachaBtn = document.getElementById('btn-gacha');
+      const canGacha = alchemyLv >= 2 && player.gold >= 30 && player.wood >= 20 && player.stone >= 20 && !isSaving;
+      gachaBtn.disabled = !canGacha;
+      gachaBtn.textContent = alchemyLv < 2 ? '🔒 需煉金室 Lv.2' : '✨ 啟動煉成陣';
+
+      const grid = document.getElementById('title-grid');
+      grid.innerHTML = TITLE_CATALOG.map(t => {
+        const owned = player.stats.titles.includes(t.id);
+        const equipped = player.stats.equippedTitle === t.id;
+        const icon = t.icon || (t.type === 'shop' ? '🎖️' : '🏆');
+
+        let actionHtml = '';
+        if (equipped) {
+          actionHtml = `<button disabled class="w-full py-1.5 rounded-lg text-xs font-black bg-emerald-800 text-emerald-100 border border-emerald-400">✔ 目前佩戴中</button>`;
+        } else if (owned) {
+          actionHtml = `<button onclick="equipTitle('${t.id}')" ${isSaving ? 'disabled' : ''} class="rpg-btn w-full py-1.5 rounded-lg text-xs cursor-pointer">🎖️ 換上此頭銜</button>`;
+        } else if (t.type === 'shop') {
+          const canBuy = player.gold >= t.cost.gold && player.wood >= t.cost.wood && player.stone >= t.cost.stone && !isSaving;
+          actionHtml = `<button onclick="buyTitle('${t.id}')" ${!canBuy ? 'disabled' : ''} class="rpg-btn w-full py-1.5 rounded-lg text-xs cursor-pointer">${canBuy ? '💰 兌換頭銜' : '資源不足'}</button>`;
+        } else {
+          actionHtml = `<button disabled class="w-full py-1.5 rounded-lg text-xs font-bold bg-stone-800 text-stone-400 border border-stone-700">🔒 尚未達成條件</button>`;
+        }
+
+        return `
+          <div class="bg-stone-900/95 border-2 ${equipped ? 'border-emerald-400' : (owned ? 'border-amber-600/80' : 'border-stone-700 opacity-80')} rounded-xl p-3 flex flex-col justify-between">
+            <div class="mb-2">
+              <div class="flex justify-between items-center mb-1">
+                <span class="font-black text-sm text-amber-200">${icon} 【${t.id}】</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded ${t.type === 'achievement' ? 'bg-sky-950 text-sky-300 border border-sky-700' : 'bg-purple-950 text-purple-300 border border-purple-700'}">
+                  ${t.type === 'achievement' ? '成就' : '商城'}
+                </span>
+              </div>
+              <div class="text-xs text-amber-100/75">${formatTitleDesc(t)}</div>
+            </div>
+            ${actionHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function equipTitle(titleId) {
+      if (isSaving || !player.stats.titles.includes(titleId)) return;
+      player.stats.equippedTitle = titleId;
+      savePlayerSession(player);
+      renderTitlesAndGacha();
+      showToast(`🎖️ 已將看板頭銜更換為【${titleId}】！`);
+      await syncAlchemyCloud();
+    }
+
+    async function buyTitle(titleId) {
+      if (isSaving) return;
+      const t = TITLE_CATALOG.find(item => item.id === titleId && item.type === 'shop');
+      if (!t || player.stats.titles.includes(titleId)) return;
+      if (player.gold < t.cost.gold || player.wood < t.cost.wood || player.stone < t.cost.stone) return;
+
+      player.gold -= t.cost.gold;
+      player.wood -= t.cost.wood;
+      player.stone -= t.cost.stone;
+      player.stats.titles.push(titleId);
+      player.stats.equippedTitle = titleId;
+
+      savePlayerSession(player);
+      refreshHUD();
+      renderTitlesAndGacha();
+      showToast(`👑 兌換成功並自動佩戴新頭銜【${titleId}】！`);
+      await syncAlchemyCloud();
+    }
+
+    async function pullGacha() {
+      if (isSaving || alchemyLv < 2) return;
+      if (player.gold < 30 || player.wood < 20 || player.stone < 20) return;
+
+      player.gold -= 30;
+      player.wood -= 20;
+      player.stone -= 20;
+      player.stats.gachaCount = (player.stats.gachaCount || 0) + 1;
+
+      const roll = Math.random();
+      let resultMsg = '';
+      if (roll < 0.35) {
+        player.stats.potions.doubleReward = (player.stats.potions.doubleReward || 0) + 2;
+        resultMsg = '🔮 盲盒閃耀金光！獲得【🧪 雙倍賞金藥水 ×2 題份】！';
+      } else if (roll < 0.65) {
+        player.gold += 85;
+        resultMsg = '💰 賢者點石成金！盲盒爆出【🪙 +85 金幣】大獎！';
+      } else if (roll < 0.90) {
+        player.stats.potions.streakShield = (player.stats.potions.streakShield || 0) + 1;
+        resultMsg = '🛡️ 盲盒開出守護符文！獲得【連勝守護藥水 ×1】！';
+      } else {
+        player.gold += 150;
+        player.wood += 50;
+        player.stone += 50;
+        resultMsg = '🌈 傳說級大爆發！！盲盒開出【🪙+150 🪵+50 🪨+50】超級大禮包！';
+      }
+
+      // 順便檢查是否有達成盲盒次數相關成就
+      TITLE_CATALOG.forEach(t => {
+        if (t.type === 'achievement' && !player.stats.titles.includes(t.id) && checkTitleCondition(t)) {
+          player.stats.titles.push(t.id);
+          resultMsg += ` 並解鎖成就頭銜【${t.id}】！`;
+        }
+      });
+
+      savePlayerSession(player);
+      refreshHUD();
+      renderTitlesAndGacha();
+      showToast(resultMsg);
+      await syncAlchemyCloud();
+    }
+
+    async function syncAlchemyCloud() {
+      if (isSaving || !GAS_API_URL) return;
+      isSaving = true;
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'saveProgress', player })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && Array.isArray(data.leaderboard)) {
+          sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard));
+        }
+      } catch (err) {
+        console.error('煉金室雲端存檔失敗：', err);
+      } finally {
+        isSaving = false;
+      }
+    }
+  </script>
+</body>
+</html>

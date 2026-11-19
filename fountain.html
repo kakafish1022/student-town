@@ -28,8 +28,10 @@
       width: 100%;
       max-width: 720px;
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
+      gap: 10px;
       background: rgba(15, 23, 42, 0.85);
       border: 2px solid #d4af37;
       border-radius: 12px;
@@ -56,8 +58,9 @@
 
     .player-status {
       display: flex;
-      gap: 14px;
-      font-size: 15px;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 14px;
       font-weight: bold;
       color: #ffd700;
     }
@@ -177,6 +180,7 @@
       display: none;
       max-width: 720px;
       width: 100%;
+      line-height: 1.6;
     }
 
     /* =========================================
@@ -340,15 +344,16 @@
     <button class="back-btn" onclick="goBackTown()">⬅ 返回小鎮</button>
     <div class="player-status">
       <span id="uiNickname">冒險者</span>
-      <span>💰 <span id="uiCoins">0</span></span>
-      <span>🔥 連簽 <span id="uiStreak">0</span> 天</span>
+      <span>💰 <span id="uiGold">0</span></span>
+      <span>🪵 <span id="uiWood">0</span></span>
+      <span>🪨 <span id="uiStone">0</span></span>
     </div>
   </div>
 
   <!-- 頁面標題 -->
   <div class="header-title">
     <h1>⛲ 奇幻許願池與智慧女神殿</h1>
-    <p>每日投幣祈福領取金幣，向智慧女神求取今日專屬神諭！</p>
+    <p>每日投幣祈福領取資源，向智慧女神求取今日專屬神諭！</p>
   </div>
 
   <!-- 雙互動卡片 -->
@@ -358,7 +363,7 @@
       <div class="shrine-icon">⛲</div>
       <h2>星光許願池</h2>
       <p class="shrine-desc">
-        每天來許願池報到一次，即可獲得基礎 50 金幣，連續簽到天數越多，獎勵越豐厚！
+        每天來許願池報到一次，即可獲得金幣、木材與石頭祝福，累積第 4 天與第 7 天還有超級寶箱大獎！
       </p>
       <button class="action-btn btn-sign" id="btnSign" onclick="handleDailySign()">
         ✨ 每日許願簽到
@@ -412,33 +417,67 @@
   </div>
 
   <script>
-    // ⚠️ 請確認此處為你最新的 Google Apps Script 網頁應用程式部署網址
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzzAYrRCU8RNzqKA5i5Z9i5KEngeswK4sAN3HKKALkTF4A-IVl-bRQVrfhkSGfKDEDgdA/exec";
 
-    let currentUser = null;
+    let currentPlayer = null;
+    let storageKey = "mathTownPlayer";
 
-    // 初始化讀取玩家資料
+    // 自動搜尋 localStorage 裡現有的玩家存檔（相容各種 key 命名）
+    function loadPlayerFromStorage() {
+      const candidateKeys = ["mathTownPlayer", "playerData", "currentPlayer", "math_town_player", "mathTownUser"];
+      for (const k of candidateKeys) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.studentId || parsed.classNum)) {
+              storageKey = k;
+              return parsed;
+            }
+          } catch (e) {}
+        }
+      }
+      // 若都沒命中，掃描整個 localStorage 尋找含有 studentId 的物件
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        try {
+          const parsed = JSON.parse(localStorage.getItem(k));
+          if (parsed && parsed.studentId) {
+            storageKey = k;
+            return parsed;
+          }
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    function savePlayerToStorage() {
+      if (currentPlayer && storageKey) {
+        localStorage.setItem(storageKey, JSON.stringify(currentPlayer));
+      }
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
-      const savedUserStr = localStorage.getItem("mathTownUser");
-      if (!savedUserStr) {
-        alert("請先登入《數學奇幻小鎮》喔！");
+      currentPlayer = loadPlayerFromStorage();
+      if (!currentPlayer) {
+        alert("找不到冒險者存檔，請先從大廳登入喔！");
         window.location.href = "index.html";
         return;
       }
-      currentUser = JSON.parse(savedUserStr);
       updateTopUI();
     });
 
     function updateTopUI() {
-      if (!currentUser) return;
-      document.getElementById("uiNickname").textContent = currentUser.nickname || currentUser.username;
-      document.getElementById("uiCoins").textContent = currentUser.coins ?? 0;
-      document.getElementById("uiStreak").textContent = currentUser.streak ?? 0;
+      if (!currentPlayer) return;
+      document.getElementById("uiNickname").textContent = currentPlayer.nickname || currentPlayer.studentId;
+      document.getElementById("uiGold").textContent = currentPlayer.gold ?? 0;
+      document.getElementById("uiWood").textContent = currentPlayer.wood ?? 0;
+      document.getElementById("uiStone").textContent = currentPlayer.stone ?? 0;
     }
 
     function showToast(text) {
       const el = document.getElementById("toastMsg");
-      el.textContent = text;
+      el.innerHTML = text;
       el.style.display = "block";
     }
 
@@ -447,10 +486,10 @@
     }
 
     // =========================================
-    // 動作 1：每日許願池簽到
+    // 動作 1：每日許願池簽到（對接 Code.gs 動作 E）
     // =========================================
     async function handleDailySign() {
-      if (!currentUser) return;
+      if (!currentPlayer) return;
       const btn = document.getElementById("btnSign");
       btn.disabled = true;
       btn.textContent = "⏳ 許願祈福中...";
@@ -460,22 +499,28 @@
           method: "POST",
           body: JSON.stringify({
             action: "dailySign",
-            username: currentUser.username
+            studentId: currentPlayer.studentId
           })
         });
         const data = await res.json();
 
-        if (data.status === "success" || data.status === "already") {
-          currentUser.coins = data.coins;
-          currentUser.streak = data.streak;
-          localStorage.setItem("mathTownUser", JSON.stringify(currentUser));
+        if (data.success) {
+          currentPlayer.gold = data.totals.gold;
+          currentPlayer.wood = data.totals.wood;
+          currentPlayer.stone = data.totals.stone;
+          savePlayerToStorage();
           updateTopUI();
-          showToast(data.message);
+          showToast(
+            `✨ ${data.rewardTitle}（累積第 ${data.streak} 天）<br>` +
+            `獲得：💰+${data.reward.gold}、🪵+${data.reward.wood}、🪨+${data.reward.stone}`
+          );
+        } else if (data.alreadySigned) {
+          showToast(`💧 ${data.message}（目前累積第 ${data.streak} 天）`);
         } else {
           showToast("⚠️ " + (data.message || "簽到失敗"));
         }
       } catch (err) {
-        showToast("⚠️ 連線失敗，請檢查網路或 GAS 部署網址");
+        showToast("⚠️ 連線失敗，請檢查網路狀態");
       } finally {
         btn.disabled = false;
         btn.textContent = "✨ 每日許願簽到";
@@ -483,10 +528,10 @@
     }
 
     // =========================================
-    // 動作 2：智慧女神求籤（支援三欄＋3D翻卡）
+    // 動作 2：智慧女神求籤（對接 Code.gs 動作 F ＋ 3D翻卡）
     // =========================================
     async function handleDrawFortune() {
-      if (!currentUser) return;
+      if (!currentPlayer) return;
       const btn = document.getElementById("btnFortune");
       btn.disabled = true;
       btn.textContent = "🔮 感應神諭中...";
@@ -496,12 +541,13 @@
           method: "POST",
           body: JSON.stringify({
             action: "drawFortune",
-            username: currentUser.username
+            studentId: currentPlayer.studentId,
+            nickname: currentPlayer.nickname
           })
         });
         const data = await res.json();
 
-        if (data.status === "success") {
+        if (data.success) {
           if (data.alreadyDrawn) {
             showToast("💡 今日已向女神求過籤囉！為你重新展開今日神諭（點擊卡片可翻面解籤）。");
           } else {
@@ -512,7 +558,7 @@
           showToast("⚠️ " + (data.message || "求籤失敗"));
         }
       } catch (err) {
-        showToast("⚠️ 連線失敗，請檢查網路或 GAS 部署網址");
+        showToast("⚠️ 連線失敗，請檢查網路狀態");
       } finally {
         btn.disabled = false;
         btn.textContent = "🔮 向女神求今日籤";
@@ -524,12 +570,12 @@
       const card = document.getElementById("fortuneCard");
       card.classList.remove("is-flipped"); // 每次打開預設先呈現正面
 
-      // 1. 設定籤運顏色與文字
+      // 1. 設定籤運顏色與文字（兼容 level 與 luck 欄位）
       const luckEl = document.getElementById("cardLuck");
-      const luckText = data.luck || "中吉";
+      const luckText = data.level || data.luck || "中吉";
       luckEl.textContent = luckText;
       if (luckText.includes("凶")) {
-        luckEl.style.background = "#1e293b"; // 凶籤用深藍黑底金字，更有警示感
+        luckEl.style.background = "#1e293b"; // 凶籤用深藍黑底金字
       } else {
         luckEl.style.background = "#8b0000"; // 吉籤用傳統朱紅底金字
       }

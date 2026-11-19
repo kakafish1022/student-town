@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>數學奇幻小鎮 - 城鎮中心</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="config.js"></script>
+  <style>
+    body {
+      background: #120d0a;
+      color: #f3e5ab;
+      margin: 0;
+      overflow: hidden;
+      font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+      user-select: none;
+    }
+
+    .rpg-panel {
+      background: linear-gradient(145deg, #2b1d14, #1c120c);
+      border: 3px solid #c89d54;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.9);
+    }
+
+    .rpg-btn {
+      background: linear-gradient(180deg, #e5b567, #b88232);
+      border: 2px solid #fff2cc;
+      color: #231409;
+      font-weight: 900;
+      transition: transform 0.15s, filter 0.15s;
+    }
+
+    .rpg-btn:hover:not(:disabled) {
+      filter: brightness(1.08);
+      transform: scale(1.03);
+    }
+
+    .rpg-btn:disabled {
+      background: #3f3226;
+      border-color: #6b5642;
+      color: #8c7662;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* 場景熱區樣式 */
+    .hotspot {
+      position: absolute;
+      cursor: pointer;
+      border-radius: 16px;
+      transition: background 0.2s, box-shadow 0.2s;
+      z-index: 10;
+    }
+
+    .hotspot:hover {
+      background: rgba(255, 223, 100, 0.18);
+      box-shadow: 0 0 24px rgba(255, 215, 0, 0.6);
+    }
+
+    .hotspot-label {
+      position: absolute;
+      top: 6%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.94);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 800;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s, transform 0.15s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.75);
+    }
+
+    .hotspot:hover .hotspot-label {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* 底部操作提示條 */
+    .loading-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(25, 16, 10, 0.94);
+      border: 2px solid #e5b567;
+      color: #ffea9f;
+      padding: 8px 22px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 14px;
+      z-index: 50;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
+      max-width: 92vw;
+      text-align: center;
+    }
+  </style>
+</head>
+<body class="w-screen h-screen flex items-center justify-center relative">
+  <!-- 滿版城鎮中心像素底圖 -->
+  <img id="img-hall" src="town_hall.png" alt="城鎮中心" class="w-full h-full object-contain" style="image-rendering: pixelated;" />
+  <div id="hall-layer" class="absolute"></div>
+
+  <!-- 左上角返回小鎮按鈕 -->
+  <div class="absolute top-3 left-3 z-20">
+    <button onclick="window.location.href='town.html'" class="rpg-btn px-4 py-2 rounded-xl text-sm shadow-lg cursor-pointer flex items-center gap-1.5">
+      ↩ 返回小鎮地圖
+    </button>
+  </div>
+
+  <!-- 右上角玩家資源與階段狀態列 -->
+  <div class="absolute top-3 right-3 flex items-center pointer-events-none z-20">
+    <div class="rpg-panel pointer-events-auto px-4 py-2 rounded-xl flex items-center gap-3 md:gap-4 text-xs md:text-sm">
+      <span class="text-amber-400 font-black" id="hud-name">勇者</span>
+      <span>🪙 <b id="hud-gold">0</b></span>
+      <span>🪵 <b id="hud-wood">0</b></span>
+      <span>🪨 <b id="hud-stone">0</b></span>
+      <span class="text-xs bg-amber-800 px-2.5 py-0.5 rounded-full border border-amber-400" id="hud-stage">Lv.1</span>
+    </div>
+  </div>
+
+  <!-- 底部操作提示 -->
+  <div id="toast-box" class="loading-toast">
+    🏛️ 點擊中央【微縮城鎮沙盤】升級建築、左側【皇冠榜單】看英雄榜、右側【老村長】查戰績！
+  </div>
+
+  <!-- =========================================================
+       彈窗 1：中央微縮沙盤 -> 城鎮建設與建築升級面板
+       ========================================================= -->
+  <div id="modal-upgrade" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-4xl w-full p-5 md:p-6 rounded-2xl max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-4">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">🏗️ 城鎮建設藍圖（微縮沙盤）</h2>
+          <p class="text-xs text-amber-200/80 mt-0.5">全鎮 6 棟建築皆達 <b>Lv.2</b> 進化為「石造繁榮鎮」，皆達 <b>Lv.3</b> 進化為「黃金水晶之都」！</p>
+        </div>
+        <button onclick="document.getElementById('modal-upgrade').classList.add('hidden')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <!-- 目前持有資源提示條 -->
+      <div class="bg-black/45 border border-amber-600/50 rounded-xl px-4 py-2 mb-4 flex flex-wrap justify-between items-center gap-2 text-sm">
+        <span class="font-bold text-amber-300">🎒 鎮庫現有資源：</span>
+        <div class="flex gap-4 font-black">
+          <span>🪙 金幣：<b id="modal-gold" class="text-amber-300">0</b></span>
+          <span>🪵 木材：<b id="modal-wood" class="text-emerald-300">0</b></span>
+          <span>🪨 石頭：<b id="modal-stone" class="text-sky-300">0</b></span>
+        </div>
+      </div>
+
+      <!-- 6 棟建築卡片網格 -->
+      <div id="building-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-y-auto pr-1 flex-1">
+        <!-- JS 動態生成 6 棟建築卡片 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 2：左側皇冠金框榜單 -> 全鎮繁榮度英雄榜
+       ========================================================= -->
+  <div id="modal-rank" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-2xl w-full p-5 md:p-6 rounded-2xl max-h-[88vh] flex flex-col">
+      <div class="flex justify-between items-center border-b-2 border-amber-700/70 pb-3 mb-4">
+        <div>
+          <h2 class="text-xl md:text-2xl font-black text-amber-300">🏆 全鎮繁榮度英雄榜（Top 15）</h2>
+          <p class="text-xs text-amber-200/80 mt-0.5">繁榮度計算公式：建築總等級 × 100 ＋ 答對題數 × 10</p>
+        </div>
+        <button onclick="document.getElementById('modal-rank').classList.add('hidden')" class="bg-stone-800 hover:bg-stone-700 text-amber-200 border border-amber-500/60 px-3 py-1.5 rounded-lg text-sm font-bold cursor-pointer">
+          ✕ 關閉
+        </button>
+      </div>
+
+      <div class="overflow-y-auto flex-1 rounded-xl border border-amber-700/60 bg-black/40">
+        <table class="w-full text-left border-collapse text-xs md:text-sm">
+          <thead>
+            <tr class="bg-amber-950/90 text-amber-300 border-b border-amber-700">
+              <th class="py-2.5 px-3 text-center w-14">名次</th>
+              <th class="py-2.5 px-3">班級勇者</th>
+              <th class="py-2.5 px-3 text-center">小鎮階段</th>
+              <th class="py-2.5 px-3 text-center">答對題數</th>
+              <th class="py-2.5 px-3 text-right">繁榮度</th>
+            </tr>
+          </thead>
+          <tbody id="rank-tbody" class="divide-y divide-amber-900/40">
+            <!-- JS 動態生成排行榜 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       彈窗 3：右側白髮老村長 -> 個人學習戰績與帳號管理
+       ========================================================= -->
+  <div id="modal-stats" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
+    <div class="rpg-panel max-w-md w-full p-6 rounded-2xl text-center">
+      <div class="text-4xl mb-1">🧙‍♂️</div>
+      <h2 class="text-xl font-black text-amber-300 mb-1">老村長的冒險檔案室</h2>
+      <p class="text-xs text-amber-200/85 mb-4" id="stats-subtitle">「年輕的勇者，每解開一道數學謎題，小鎮就更繁榮一分！」</p>
+
+      <div class="bg-black/45 border border-amber-600/60 rounded-xl p-4 mb-4 text-left space-y-2.5 text-sm">
+        <div class="flex justify-between">
+          <span class="text-amber-200/80">冒險者身分：</span>
+          <b class="text-amber-300" id="stat-identity">-</b>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-amber-200/80">累計挑戰題數：</span>
+          <b id="stat-solved">0 題</b>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-amber-200/80">累計答對題數：</span>
+          <b class="text-emerald-400" id="stat-correct">0 題</b>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-amber-200/80">綜合答對率：</span>
+          <b class="text-sky-300" id="stat-rate">0%</b>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-amber-200/80">最高連勝紀錄：</span>
+          <b class="text-rose-400" id="stat-streak">0 連勝</b>
+        </div>
+        <div class="border-t border-amber-800/60 pt-2 flex justify-between text-base">
+          <span class="text-amber-300 font-bold">✨ 目前城鎮繁榮度：</span>
+          <b class="text-amber-400" id="stat-prosperity">0</b>
+        </div>
+      </div>
+
+      <div class="flex gap-3 justify-center">
+        <button onclick="logoutPlayer()" class="bg-red-950 hover:bg-red-900 border border-red-500/70 text-red-200 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">
+          🚪 登出切換帳號
+        </button>
+        <button onclick="document.getElementById('modal-stats').classList.add('hidden')" class="rpg-btn px-6 py-2 rounded-xl text-sm cursor-pointer">
+          返回大廳
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const player = getPlayerSession();
+    if (!player) window.location.href = 'index.html';
+
+    // 精準對應 town_hall.png 構圖的三大互動熱區
+    const HALL_HOTSPOTS = [
+      { id: "rank",    name: "🏆 全鎮繁榮度英雄榜",   left: 7.5,  top: 11.0, width: 27.5, height: 42.0 },
+      { id: "upgrade", name: "🏗️ 城鎮建設與建築升級", left: 28.0, top: 38.0, width: 40.0, height: 35.0 },
+      { id: "stats",   name: "🧙‍♂️ 老村長・戰績與設定", left: 62.5, top: 18.0, width: 30.0, height: 36.0 }
+    ];
+
+    // 6 棟建築設定（key 嚴格對應 player.buildings）
+    const BUILDING_CONFIG = [
+      { key: 'hall',     icon: '🏛️', name: '城鎮中心',     desc: '小鎮行政中樞，象徵城鎮整體繁榮與榮耀。' },
+      { key: 'tavern',   icon: '🍺', name: '冒險者酒館',   desc: '承接數學懸賞任務，等級越高可解鎖高星級賞金！' },
+      { key: 'alchemy',  icon: '⚗️', name: '魔法煉金室',   desc: '調配數學比例藥水與資源轉換的神秘工坊。' },
+      { key: 'fountain', icon: '⛲', name: '中央許願池',   desc: '匯聚星光水靈之力與智慧女神的神諭聖地。' },
+      { key: 'board',    icon: '📋', name: '村莊佈告欄',   desc: '發布村長重要通告與全班勇者交流心得的廣場。' },
+      { key: 'ranch',    icon: '🐾', name: '奇幻寵物牧場', desc: '培育可愛數學小精靈的溫馨牧場。' }
+    ];
+
+    // 升級所需資源表（Lv.1 -> Lv.2 / Lv.2 -> Lv.3）
+    const UPGRADE_COSTS = {
+      1: { gold: 100, wood: 50,  stone: 50  },
+      2: { gold: 300, wood: 150, stone: 150 }
+    };
+
+    let isSaving = false;
+
+    function showToast(msg) {
+      document.getElementById('toast-box').innerHTML = msg;
+    }
+
+    function refreshHUD() {
+      document.getElementById('hud-name').textContent = `${player.nickname} (${player.classNum}-${player.seatNum})`;
+      document.getElementById('hud-gold').textContent = player.gold;
+      document.getElementById('hud-wood').textContent = player.wood;
+      document.getElementById('hud-stone').textContent = player.stone;
+
+      const minLv = Math.min(...Object.values(player.buildings));
+      const stage = Math.min(3, Math.max(1, minLv));
+      document.getElementById('hud-stage').textContent =
+        stage === 1 ? 'Lv.1 拓荒木屋村' : stage === 2 ? 'Lv.2 石造繁榮鎮' : 'Lv.3 黃金水晶之都';
+    }
+
+    refreshHUD();
+
+    initHotspotLayer('img-hall', 'hall-layer', HALL_HOTSPOTS, (item) => {
+      if (item.id === 'upgrade') {
+        openUpgradeModal();
+      } else if (item.id === 'rank') {
+        openRankModal();
+      } else if (item.id === 'stats') {
+        openStatsModal();
+      }
+    });
+
+    // =========================================================
+    // 1. 建築升級系統
+    // =========================================================
+    function openUpgradeModal() {
+      renderBuildings();
+      document.getElementById('modal-upgrade').classList.remove('hidden');
+    }
+
+    function renderBuildings() {
+      document.getElementById('modal-gold').textContent = player.gold;
+      document.getElementById('modal-wood').textContent = player.wood;
+      document.getElementById('modal-stone').textContent = player.stone;
+
+      const grid = document.getElementById('building-grid');
+      grid.innerHTML = '';
+
+      BUILDING_CONFIG.forEach(b => {
+        const curLv = Number(player.buildings[b.key] || 1);
+        const isMax = curLv >= 3;
+        const cost = UPGRADE_COSTS[curLv];
+        const canAfford = !isMax &&
+          player.gold >= cost.gold &&
+          player.wood >= cost.wood &&
+          player.stone >= cost.stone;
+
+        const card = document.createElement('div');
+        card.className = 'bg-stone-900/90 border-2 border-amber-700/80 rounded-xl p-3.5 flex flex-col justify-between';
+
+        let actionHtml = '';
+        if (isMax) {
+          actionHtml = `
+            <div class="mt-3 py-2 text-center rounded-lg bg-amber-950/80 border border-amber-400/60 text-amber-300 text-xs font-black">
+              👑 已達最高等級 (Lv.3 MAX)
+            </div>
+          `;
+        } else {
+          const gColor = player.gold >= cost.gold ? 'text-amber-300' : 'text-rose-400';
+          const wColor = player.wood >= cost.wood ? 'text-emerald-300' : 'text-rose-400';
+          const sColor = player.stone >= cost.stone ? 'text-sky-300' : 'text-rose-400';
+
+          actionHtml = `
+            <div class="mt-3 pt-2.5 border-t border-amber-900/60">
+              <div class="text-[11px] text-amber-200/80 mb-1.5 font-bold">升級至 Lv.${curLv + 1} 所需材料：</div>
+              <div class="flex justify-between text-xs font-black bg-black/50 px-2.5 py-1.5 rounded-lg mb-2.5">
+                <span class="${gColor}">🪙 ${cost.gold}</span>
+                <span class="${wColor}">🪵 ${cost.wood}</span>
+                <span class="${sColor}">🪨 ${cost.stone}</span>
+              </div>
+              <button
+                onclick="upgradeBuilding('${b.key}')"
+                ${(!canAfford || isSaving) ? 'disabled' : ''}
+                class="rpg-btn w-full py-1.5 rounded-lg text-xs cursor-pointer">
+                ${isSaving ? '⏳ 施工存檔中...' : (canAfford ? `🔨 消耗資源升級 Lv.${curLv + 1}` : '資源不足')}
+              </button>
+            </div>
+          `;
+        }
+
+        card.innerHTML = `
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <span class="font-black text-base text-amber-200">${b.icon} ${b.name}</span>
+              <span class="px-2 py-0.5 rounded-full text-xs font-black ${curLv === 3 ? 'bg-amber-400 text-stone-950' : 'bg-amber-900 text-amber-200 border border-amber-500'}">
+                Lv.${curLv}
+              </span>
+            </div>
+            <p class="text-xs text-amber-100/75 leading-relaxed">${b.desc}</p>
+          </div>
+          ${actionHtml}
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    async function upgradeBuilding(key) {
+      if (isSaving) return;
+      const curLv = Number(player.buildings[key] || 1);
+      if (curLv >= 3) return;
+
+      const cost = UPGRADE_COSTS[curLv];
+      if (player.gold < cost.gold || player.wood < cost.wood || player.stone < cost.stone) {
+        showToast('⚠️ 資源不足，快去解題或許願池收集材料吧！');
+        return;
+      }
+
+      isSaving = true;
+      const prevMinStage = Math.min(3, Math.min(...Object.values(player.buildings)));
+
+      // 扣除資源並提升建築等級
+      player.gold -= cost.gold;
+      player.wood -= cost.wood;
+      player.stone -= cost.stone;
+      player.buildings[key] = curLv + 1;
+
+      savePlayerSession(player);
+      refreshHUD();
+      renderBuildings();
+      showToast('🔨 矮人工匠正在趕工擴建並同步雲端存檔...');
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'saveProgress',
+            player: player
+          })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          if (Array.isArray(data.leaderboard)) {
+            sessionStorage.setItem('math_town_rank', JSON.stringify(data.leaderboard));
+          }
+          const newMinStage = Math.min(3, Math.min(...Object.values(player.buildings)));
+          const bInfo = BUILDING_CONFIG.find(item => item.key === key);
+
+          if (newMinStage > prevMinStage) {
+            const stageName = newMinStage === 2 ? '石造繁榮鎮 (Lv.2)' : '黃金水晶之都 (Lv.3)';
+            showToast(`🎉 奇蹟發生！全鎮建築皆達標，小鎮正式進化為【${stageName}】！`);
+          } else {
+            showToast(`✨ 【${bInfo.name}】成功升級至 Lv.${curLv + 1}！雲端存檔完成！`);
+          }
+        } else {
+          showToast(`⚠️ 雲端存檔異常：${data.message || '請稍後再試'}`);
+        }
+      } catch (err) {
+        showToast('⚠️ 網路連線不穩，已暫存於本地，請留意網路狀態');
+      } finally {
+        isSaving = false;
+        renderBuildings();
+      }
+    }
+
+    // =========================================================
+    // 2. 全鎮繁榮度英雄榜
+    // =========================================================
+    function openRankModal() {
+      const ranks = JSON.parse(sessionStorage.getItem('math_town_rank') || '[]');
+      const tbody = document.getElementById('rank-tbody');
+      tbody.innerHTML = '';
+
+      if (ranks.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-amber-200/70">目前尚無英雄榜資料，快去升級建築搶下第一名吧！</td></tr>`;
+      } else {
+        ranks.forEach((r, idx) => {
+          const isMe = (r.studentId === player.studentId);
+          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+          const stageBadge = r.townStage === 3 ? '👑 水晶之都' : r.townStage === 2 ? '🏰 石造繁榮鎮' : '⛺ 拓荒木屋村';
+
+          const tr = document.createElement('tr');
+          tr.className = isMe ? 'bg-amber-800/45 font-bold text-amber-200' : 'hover:bg-amber-950/40';
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 text-center font-black text-base">${medal}</td>
+            <td class="py-2.5 px-3">
+              <span class="text-xs bg-stone-800 border border-amber-700/60 px-1.5 py-0.5 rounded mr-1">${r.classNum}</span>
+              <span>${escapeHtml(r.nickname)}</span>
+              ${isMe ? '<span class="ml-1 text-[11px] text-amber-300">(我)</span>' : ''}
+            </td>
+            <td class="py-2.5 px-3 text-center text-xs">${stageBadge} <span class="text-amber-300/80">(總Lv.${r.totalLevel})</span></td>
+            <td class="py-2.5 px-3 text-center font-bold text-emerald-300">${r.correct} 題</td>
+            <td class="py-2.5 px-3 text-right font-black text-amber-300">${r.prosperity}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      document.getElementById('modal-rank').classList.remove('hidden');
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // =========================================================
+    // 3. 個人戰績統計與登出
+    // =========================================================
+    function openStatsModal() {
+      const s = player.stats || { solved: 0, correct: 0, streak: 0 };
+      const b = player.buildings || {};
+      const totalLevel = (b.tavern||1) + (b.hall||1) + (b.alchemy||1) + (b.fountain||1) + (b.board||1) + (b.ranch||1);
+      const prosperity = totalLevel * 100 + (Number(s.correct) || 0) * 10;
+      const rate = s.solved > 0 ? Math.round((s.correct / s.solved) * 100) : 0;
+
+      document.getElementById('stat-identity').textContent = `${player.classNum}班 ${player.seatNum}號 ${player.nickname}`;
+      document.getElementById('stat-solved').textContent = `${s.solved} 題`;
+      document.getElementById('stat-correct').textContent = `${s.correct} 題`;
+      document.getElementById('stat-rate').textContent = `${rate}%`;
+      document.getElementById('stat-streak').textContent = `${s.streak} 連勝`;
+      document.getElementById('stat-prosperity').textContent = `${prosperity} 點`;
+
+      document.getElementById('modal-stats').classList.remove('hidden');
+    }
+
+    function logoutPlayer() {
+      sessionStorage.removeItem('math_town_player');
+      window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>

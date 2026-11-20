@@ -7,16 +7,15 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="config.js"></script>
   <style>
-      /* 隱藏所有區塊的預設捲軸（仍保留滾輪滑動功能） */
-  * {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE / Edge */
-  }
-  *::-webkit-scrollbar {
-    display: none; /* Chrome / Safari / Edge */
-  }
+    /* 隱藏所有區塊的預設捲軸（仍保留滾輪滑動功能） */
+    * {
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE / Edge */
+    }
+    *::-webkit-scrollbar {
+      display: none; /* Chrome / Safari / Edge */
+    }
 
-  /* 下面保留你原本的 CSS 樣式... */
     body {
       background: #120d0a;
       color: #f3e5ab;
@@ -106,6 +105,16 @@
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
       max-width: 92vw;
       text-align: center;
+    }
+
+    /* 數學上標樣式微調 */
+    sup {
+      font-size: 0.72em;
+      line-height: 0;
+      position: relative;
+      vertical-align: baseline;
+      top: -0.45em;
+      margin-left: 1px;
     }
   </style>
 </head>
@@ -258,6 +267,15 @@
   <script>
     const player = getPlayerSession();
     if (!player) window.location.href = 'index.html';
+
+    // 自動將題目與選項中的 ^ 符號轉為右上角上標（支援 2^3、x^2、10^{-4}、10^(-4)）
+    function formatMathText(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/\^\{([^}]+)\}/g, '<sup>$1</sup>')
+        .replace(/\^\(([^)]+)\)/g, '<sup>$1</sup>')
+        .replace(/\^([0-9a-zA-Z+-]+)/g, '<sup>$1</sup>');
+    }
 
     // 精準對應 tavern.webp 構圖的四大互動熱區
     const TAVERN_HOTSPOTS = [
@@ -616,13 +634,13 @@
             <span class="text-xs bg-amber-900 text-amber-200 px-2 py-0.5 rounded">${currentFreeQ.subject}</span>
             <span class="text-xs bg-sky-950 text-sky-300 border border-sky-700 px-2 py-0.5 rounded">${currentFreeQ.unit || '綜合練習'}</span>
           </div>
-          <div>${currentFreeQ.question}</div>
+          <div>${formatMathText(currentFreeQ.question)}</div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           ${['A', 'B', 'C', 'D'].map(key => `
             <button onclick="answerFreeQuestion('${key}')" class="rpg-btn py-3 px-4 rounded-xl text-left text-sm md:text-base cursor-pointer flex items-center gap-2.5 shadow">
               <span class="bg-stone-900 text-amber-300 w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0">${key}</span>
-              <span>${currentFreeQ.options[key] || ''}</span>
+              <span>${formatMathText(currentFreeQ.options[key] || '')}</span>
             </button>
           `).join('')}
         </div>

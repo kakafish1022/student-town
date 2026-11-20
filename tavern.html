@@ -163,7 +163,7 @@
         </button>
       </div>
 
-      <!-- 科目篩選鈕 -->
+      <!-- 科目篩選鈕（動態產生） -->
       <div id="quest-subject-tabs" class="flex flex-wrap gap-2 mb-3"></div>
 
       <!-- 任務卡片列表 -->
@@ -195,7 +195,7 @@
   </div>
 
   <!-- =========================================================
-       彈窗 2：中央吧檯 -> 自由任務（科目 + 單元下拉選單 + 指定資源）
+       彈窗 2：中央吧檯 -> 自由任務（動態考科 + 單元下拉選單 + 指定資源）
        ========================================================= -->
   <div id="modal-free" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm z-40 flex items-center justify-center p-4">
     <div class="rpg-panel max-w-2xl w-full p-5 md:p-6 rounded-2xl max-h-[92vh] flex flex-col">
@@ -227,7 +227,7 @@
             <div id="free-subject-btns" class="flex flex-wrap gap-1.5 mb-1.5"></div>
           </div>
           <select id="free-unit-select" onchange="onUnitChange()" class="w-full bg-stone-950 text-amber-200 border border-amber-600 rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none">
-            <option value="ALL">📚 全部單元綜合練習</option>
+            <option value="ALL">📚 題庫載入中...</option>
           </select>
         </div>
 
@@ -304,16 +304,9 @@
       { id: 'q_default_1', title: '畢氏定理方格大冒險', subject: '數學', url: 'https://kakafish1022.github.io/Afar-Triangle/', gold: 50, wood: 35, stone: 25 }
     ];
 
-    // 預設備援選擇題庫（當試算表 Questions 尚未貼入題目時使用）
-    let QUESTION_BANK = [
-      { subject: '數學', unit: '七上-整數運算', question: '計算 (-4) × (-5) + (-8) 的值為何？', options: { A: '12', B: '-28', C: '28', D: '-12' }, answer: 'A' },
-      { subject: '數學', unit: '七上-一元一次方程式', question: '解一元一次方程式 3x - 7 = 14，則 x = ？', options: { A: '3', B: '7', C: '21', D: '-7' }, answer: 'B' },
-      { subject: '數學', unit: '八上-畢氏定理', question: '若直角三角形兩股長分別為 6 與 8，則斜邊長為何？', options: { A: '10', B: '12', C: '14', D: '48' }, answer: 'A' },
-      { subject: '數學', unit: '七上-一元一次式', question: '化簡 2(3x - 4) - (x - 5) 的結果為何？', options: { A: '5x - 13', B: '5x - 3', C: '7x - 3', D: '5x + 1' }, answer: 'B' },
-      { subject: '英文', unit: '七上-現在進行式', question: 'Look! The students ______ basketball on the playground now.', options: { A: 'play', B: 'plays', C: 'are playing', D: 'played' }, answer: 'C' },
-      { subject: '英文', unit: '七下-現在簡單式', question: 'My brother ______ to school by bike every morning.', options: { A: 'go', B: 'goes', C: 'going', D: 'went' }, answer: 'B' },
-      { subject: '英文', unit: '七下-過去式Be動詞', question: 'There ______ two cute cats under the tree yesterday.', options: { A: 'is', B: 'are', C: 'was', D: 'were' }, answer: 'D' }
-    ];
+    // 完全移除硬編碼預設題庫，全數由試算表 Questions 動態載入
+    let QUESTION_BANK = [];
+    let isCloudLoaded = false;
 
     async function loadTavernCloudData() {
       if (!GAS_API_URL) return;
@@ -325,9 +318,21 @@
         const data = await res.json();
         if (data.status === 'success') {
           if (Array.isArray(data.quests) && data.quests.length > 0) QUEST_LIST = data.quests;
-          if (Array.isArray(data.questions) && data.questions.length > 0) QUESTION_BANK = data.questions;
+          if (Array.isArray(data.questions)) QUESTION_BANK = data.questions;
+          isCloudLoaded = true;
+
+          // 若快問快答視窗已經打開，載入完成後立刻自動刷新考科、單元與第一題
+          if (!document.getElementById('modal-free').classList.contains('hidden')) {
+            renderFreeSubjectAndUnits();
+            loadNextFreeQuestion();
+          }
+          if (!document.getElementById('modal-quests').classList.contains('hidden')) {
+            renderQuestsModal();
+          }
         }
-      } catch (e) { /* 網路異常時沿用預設備援題庫 */ }
+      } catch (e) {
+        isCloudLoaded = true;
+      }
     }
     loadTavernCloudData();
 
@@ -376,7 +381,7 @@
     }
 
     // =========================================================
-    // 1. 每日任務：外部小遊戲委託牆（每日任選 3 款領賞 + Iframe 嵌入）
+    // 1. 每日任務：外部小遊戲委託牆（動態抓取 Quests 科目）
     // =========================================================
     let selectedQuestSubject = '全部';
     let activeQuest = null;
@@ -409,10 +414,12 @@
       const leftQuota = Math.max(0, 3 - claimedList.length);
       document.getElementById('quest-quota-left').textContent = leftQuota;
 
-      const subjects = ['全部', '數學', '英文'];
+      // 動態抓出所有出現過的科目（未來新增國文、自然都會自動長出按鈕）
+      const subjects = ['全部'];
       QUEST_LIST.forEach(q => {
         if (q.subject && !subjects.includes(q.subject)) subjects.push(q.subject);
       });
+      if (!subjects.includes(selectedQuestSubject)) selectedQuestSubject = '全部';
 
       document.getElementById('quest-subject-tabs').innerHTML = subjects.map(sub => {
         const active = selectedQuestSubject === sub;
@@ -533,9 +540,9 @@
     }
 
     // =========================================================
-    // 2. 自由任務：吧檯快問快答（科目 + 單元下拉選單 + 不重複洗牌）
+    // 2. 自由任務：吧檯快問快答（全動態考科 + 單元下拉選單 + 不重複洗牌）
     // =========================================================
-    let freeSubject = '數學';
+    let freeSubject = '';
     let freeUnit = 'ALL';
     let rewardTarget = 'gold';
     let currentFreeQ = null;
@@ -560,13 +567,24 @@
     }
 
     function renderFreeSubjectAndUnits() {
-      const subjects = ['數學', '英文'];
+      // 完全依試算表實際出現的科目動態產生（未來新增國文、自然、社會會自動出現）
+      const subjects = [];
       QUESTION_BANK.forEach(q => {
         if (q.subject && !subjects.includes(q.subject)) subjects.push(q.subject);
       });
+
+      const btnBox = document.getElementById('free-subject-btns');
+      const selectEl = document.getElementById('free-unit-select');
+
+      if (subjects.length === 0) {
+        btnBox.innerHTML = `<span class="text-xs text-amber-300/70">讀取考科中...</span>`;
+        selectEl.innerHTML = `<option value="ALL">📚 題庫載入中...</option>`;
+        return;
+      }
+
       if (!subjects.includes(freeSubject)) freeSubject = subjects[0];
 
-      document.getElementById('free-subject-btns').innerHTML = subjects.map(sub => {
+      btnBox.innerHTML = subjects.map(sub => {
         const active = freeSubject === sub;
         return `<button onclick="setFreeSubject('${sub}')" class="px-3 py-1 rounded-lg text-xs font-black border cursor-pointer ${active ? 'bg-amber-400 text-stone-950 border-amber-100' : 'bg-stone-800 text-amber-200 border-amber-700'}">${sub}</button>`;
       }).join('');
@@ -575,7 +593,6 @@
       const units = Array.from(new Set(subjectQuestions.map(q => q.unit || '綜合練習')));
       if (freeUnit !== 'ALL' && !units.includes(freeUnit)) freeUnit = 'ALL';
 
-      const selectEl = document.getElementById('free-unit-select');
       selectEl.innerHTML = `<option value="ALL">📚 全部【${freeSubject}】單元（共 ${subjectQuestions.length} 題）</option>` +
         units.map(u => {
           const cnt = subjectQuestions.filter(q => (q.unit || '綜合練習') === u).length;
@@ -608,6 +625,18 @@
     }
 
     function loadNextFreeQuestion() {
+      const box = document.getElementById('free-quiz-box');
+
+      if (QUESTION_BANK.length === 0) {
+        document.getElementById('unit-q-count').textContent = isCloudLoaded ? '目前題池：0 題' : '雲端題庫同步中...';
+        box.innerHTML = `
+          <div class="bg-stone-900/95 border border-amber-600/70 rounded-xl p-6 text-center text-sm font-bold text-amber-200">
+            ${isCloudLoaded ? '📭 試算表 Questions 分頁目前尚未建立任何題目喔！' : '⏳ 正在從冒險者公會雲端讀取題庫，請稍候 1 秒...'}
+          </div>
+        `;
+        return;
+      }
+
       let pool = QUESTION_BANK.filter(q => q.subject === freeSubject);
       if (freeUnit !== 'ALL') {
         pool = pool.filter(q => (q.unit || '綜合練習') === freeUnit);
@@ -627,7 +656,6 @@
 
       currentFreeQ = shuffledQueue.pop();
 
-      const box = document.getElementById('free-quiz-box');
       box.innerHTML = `
         <div class="bg-stone-900/95 border border-amber-600/70 rounded-xl p-4 mb-3 text-sm md:text-base font-bold leading-relaxed text-amber-100">
           <div class="flex flex-wrap gap-1.5 mb-2">
